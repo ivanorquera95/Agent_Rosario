@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# datos: se regeneran corriendo el pipeline
+data/
+
+# credenciales
+.env
+*.json
+!package.json
+
+# entorno
+.venv/
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# sistema
+.DS_Store
