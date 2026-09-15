@@ -8,8 +8,16 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "pyproj>=3.7.2",
     "python-dotenv>=1.2.3",
     "requests>=2.34.2",
     "tzdata>=2026.3",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["scripts"]

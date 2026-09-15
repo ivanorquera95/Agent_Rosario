@@ -1,10 +1,11 @@
 import sys
 sys.stdout.reconfigure(encoding="utf-8")
 import os
-import math
 import unicodedata
 import requests
 from dotenv import load_dotenv
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from comun.localidades import LOCALIDADES, localidad_de, limites_gran_rosario
 
 load_dotenv()
 
@@ -14,29 +15,7 @@ API_URL_NEARBY_SEARCH = "https://places.googleapis.com/v1/places:searchNearby"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_HEADERS = {"User-Agent": "RosarioVivo/1.0 (proyecto de portfolio)"}
 
-# Las 17 localidades del Gran Rosario, con su centro y un radio propio:
-LOCALIDADES = {
-    "Rosario":                   (-32.9594, -60.6617, 12000),
-    "Villa Gobernador Gálvez":   (-33.0251, -60.6337, 5000),
-    "San Lorenzo":               (-32.7455, -60.7431, 5000),
-    "Granadero Baigorria":       (-32.8548, -60.7074, 5000),
-    "Capitán Bermúdez":          (-32.8167, -60.7167, 4000),
-    "Pérez":                     (-32.9982, -60.7709, 5000),
-    "Funes":                     (-32.9169, -60.8106, 6000),
-    "Fray Luis Beltrán":         (-32.7874, -60.7295, 4000),
-    "Roldán":                    (-32.9001, -60.9066, 6000),
-    "Puerto General San Martín": (-32.7116, -60.7341, 4000),
-    "Soldini":                   (-33.0242, -60.7553, 3000),
-    "Arroyo Seco":               (-33.1546, -60.5082, 5000),
-    "Ricardone":                 (-32.7707, -60.7842, 3000),
-    "Ibarlucea":                 (-32.8524, -60.7894, 3000),
-    "Pueblo Esther":             (-33.0789, -60.5641, 4000),
-    "Alvear":                    (-33.0575, -60.6196, 3000),
-    "General Lagos":             (-33.1104, -60.5637, 3000),
-}
 
-MARGEN_GRADOS = 0.05
-RADIO_TIERRA_METROS = 6_371_000
 RADIO_BUSQUEDA_POR_DEFECTO = 1000
 MAX_RESULTADOS_GOOGLE = 20
 RADIO_MAXIMO_METROS = 50000
@@ -83,40 +62,6 @@ def error(mensaje, instruccion, **extra):
     resultado = {"error": mensaje, "instruccion_para_el_agente": instruccion}
     resultado.update(extra)
     return resultado
-
-
-def distancia_metros(lat1, lon1, lat2, lon2):
-    # Haversine
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2
-         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
-    return 2 * RADIO_TIERRA_METROS * math.asin(math.sqrt(a))
-
-
-def localidad_de(latitud, longitud):
-    # La MAS CERCANA de las que contienen el punto, no la primera que matchea:
-    # Rosario tiene 12 km de radio y se comia a todos los vecinos.
-    candidatas = [
-        (distancia_metros(latitud, longitud, lat, lon), nombre)
-        for nombre, (lat, lon, radio) in LOCALIDADES.items()
-        if distancia_metros(latitud, longitud, lat, lon) <= radio
-    ]
-    if not candidatas:
-        return None
-    return min(candidatas)[1]
-
-
-def limites_gran_rosario():
-    # El rectangulo que Google usa como restriccion sale de las localidades, no a mano
-    latitudes = [lat for lat, _, _ in LOCALIDADES.values()]
-    longitudes = [lon for _, lon, _ in LOCALIDADES.values()]
-    return {
-        "sur": min(latitudes) - MARGEN_GRADOS,
-        "norte": max(latitudes) + MARGEN_GRADOS,
-        "oeste": min(longitudes) - MARGEN_GRADOS,
-        "este": max(longitudes) + MARGEN_GRADOS,
-    }
 
 
 def resolver_zona(lugar):
