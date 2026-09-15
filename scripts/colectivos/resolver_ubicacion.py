@@ -7,6 +7,7 @@ import os
 import math
 import re
 import unicodedata
+import difflib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -105,7 +106,24 @@ def viene_del_usuario(argumento):
     tokens = [t for t in normalizar(argumento).split() if len(t) > 2 or t.isdigit()]
     if not tokens:
         return True
-    return all(t in mensaje for t in tokens)
+
+    palabras_mensaje = mensaje.split()
+
+    def esta_en_el_mensaje(token):
+        if token in mensaje:
+            return True
+        # El modelo corrige la ortografia antes de llamar: "arquidiosesano" ->
+        # "arquidiocesano". Eso no es inventar, asi que se tolera una diferencia
+        # chica. Los numeros van exactos: una altura distinta es otra direccion.
+        if token.isdigit():
+            return False
+        return any(
+            difflib.SequenceMatcher(None, token, palabra).ratio() >= 0.8
+            for palabra in palabras_mensaje
+            if abs(len(palabra) - len(token)) <= 3
+        )
+
+    return all(esta_en_el_mensaje(t) for t in tokens)
 
 
 def error_inventado(etiqueta, argumento):
@@ -259,6 +277,12 @@ def resolver_ubicacion(texto):
          "direccion": limpiar_direccion(g["miembros"][0]["lugar"].get("direccion", ""))}
         for g in r["grupos"][:4]
     ]
+
+    # Los candidatos se le muestran al usuario para que elija: cuando elige, el modelo va a llamar con ese nombre. 
+    # #Si no quedan registrados, la guardia lo bloquea por inventado y la conversacion entra en bucle.
+    for c in base["candidatos"]:
+        registrar_conocida(c["nombre"])
+        registrar_conocida(c["direccion"])
 
     if not r["ganador"]:
         base["motivo"] = (

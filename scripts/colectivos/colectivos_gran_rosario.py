@@ -415,6 +415,49 @@ def agregar_arribos(opciones):
 
     return opciones
 
+def agregar_arribos_a_google(opciones):
+    #Pide el arribo en vivo del PRIMER tramo de cada opcion de Google si ese primer tramo es una linea urbana.
+    
+    for opcion in opciones[:MAX_OPCIONES_CON_ARRIBO]:
+        primer_tramo = opcion["tramos"][0]
+        id_parada = primer_tramo.get("id_parada_municipal")
+
+        if not id_parada:
+            primer_tramo["minutos_espera"] = []
+            primer_tramo["solo_horario_de_tabla"] = True
+            continue
+
+        try:
+            arribos_lineas = cuando_llega(id_parada)
+        except requests.RequestException:
+            primer_tramo["minutos_espera"] = []
+            primer_tramo["solo_horario_de_tabla"] = True
+            continue
+
+        # Google abrevia distinto que la API municipal: "142 N" contra
+        # "142 NEGRO". Se compara contra el nombre, el corto y el codigo.
+        from colectivos.recorridos import cargar_datos
+        datos = cargar_datos()
+        nombres_validos = set()
+        for linea in datos["lineas"].values():
+            if primer_tramo["linea"].upper() in (
+                linea["nombre"].upper(), linea["nombre_corto"].upper(), linea["codigo_emr"].upper()
+            ):
+                nombres_validos.add(linea["nombre"].upper())
+
+        minutos = []
+        for al in arribos_lineas:
+            if al["linea"]["nombre"].upper() in nombres_validos:
+                minutos = [a["arriboEnMinutos"]
+                           for a in sorted(al.get("arribos", []),
+                                           key=lambda x: x["arriboEnMinutos"])[:2]]
+                break
+
+        primer_tramo["minutos_espera"] = minutos
+        primer_tramo["solo_horario_de_tabla"] = not minutos
+
+    return opciones
+
 def planificar_viaje_completo(origen, destino, max_opciones=10, punto_origen=None, punto_destino=None):
     #Punto_origen y punto_destino permiten pasar coordenadas ya resueltas que ubica los lugares con Google Places
     #Sin esto, el texto se geocodificaria devolveria otra cosa ("Seminario Arquidiocesano" terminaba en una plazoleta).
@@ -464,7 +507,7 @@ def planificar_viaje_completo(origen, destino, max_opciones=10, punto_origen=Non
     if google.get("error"):
         resultado["google_error"] = google["error"]
     else:
-        resultado["google"] = google["opciones"]
+        resultado["google"] = agregar_arribos_a_google(google["opciones"])
         resultado["aviso_google"] = (
             "Horarios de tabla, no arribos en vivo. Incluye interurbanos que el sistema "
             "municipal no tiene. Donde dice parada_sugerida, Google mandó a la parada "

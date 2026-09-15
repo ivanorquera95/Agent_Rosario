@@ -5,6 +5,7 @@
 
 import sys
 import os
+import re
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -22,6 +23,10 @@ from colectivos.recorridos import (
     MAX_DIST_PARADA_TRAZADO_M,
 )
 
+# Las empresas interurbanas no cargan el nombre de la parada y Google devuelve
+# su codigo interno: "ROS03", "CAPB04". Para el usuario no significa nada.
+PATRON_CODIGO_PARADA = re.compile(r"^[A-Z]{2,6}[-_]?\d{1,3}$")
+MAX_DIST_REFERENCIA_M = 250
 MAX_DIST_MATCH_PARADA_M = 60
 RADIO_PARADA_ALTERNATIVA_M = 700
 
@@ -60,7 +65,62 @@ def paradas_de_la_linea(id_linea, punto):
         if p["id_linea"] == id_linea
         and distancia_metros(punto[0], punto[1], p["latitud"], p["longitud"]) <= MAX_DIST_MATCH_PARADA_M
     ]
+    
+    
+def describir_parada(nombre, punto):
+    #Si el nombre es un codigo interno, busca una esquina conocida cerca.
+    #Las paradas municipales cubren Rosario pero no las localidades vecinas, asi que afuera no va a haber ninguna cerca.
+    
+    nombre = (nombre or "").strip()
 
+    if not PATRON_CODIGO_PARADA.match(nombre) or not punto:
+        return {"nombre": nombre, "es_codigo": False, "referencia": None}
+
+    mejor, mejor_distancia = None, float("inf")
+    for p in cargar_datos()["paradas"]:
+        d = distancia_metros(punto[0], punto[1], p["latitud"], p["longitud"])
+        if d < mejor_distancia:
+            mejor, mejor_distancia = p, d
+
+    if mejor is None or mejor_distancia > MAX_DIST_REFERENCIA_M:
+        return {"nombre": nombre, "es_codigo": True, "referencia": None}
+
+    return {
+        "nombre": nombre,
+        "es_codigo": True,
+        "referencia": mejor["nombre"],
+        "metros_a_la_referencia": round(mejor_distancia),
+    }
+    
+    
+def id_parada_municipal(nombre_linea, punto):
+    #Busca el id municipal de la parada que Google devolvio por coordenadas. Sirve para pedir el arribo en vivo del primer tramo cuando es una linea urbana. 
+    
+    if not punto:
+        return None
+
+    datos = cargar_datos()
+    ids = [
+        id_linea for id_linea, linea in datos["lineas"].items()
+        if (nombre_linea or "").upper() in (
+            linea["nombre"].upper(), linea["nombre_corto"].upper(), linea["codigo_emr"].upper()
+        )
+    ]
+    if not ids:
+        return None
+
+    mejor, mejor_distancia = None, float("inf")
+    for p in datos["paradas"]:
+        if p["id_linea"] not in ids:
+            continue
+        d = distancia_metros(punto[0], punto[1], p["latitud"], p["longitud"])
+        if d < mejor_distancia:
+            mejor, mejor_distancia = p, d
+
+    if mejor is None or mejor_distancia > MAX_DIST_MATCH_PARADA_M:
+        return None
+    return mejor["id_parada"]
+ 
 def verificar_sentido(nombre_linea, subida, bajada):
     #Tres resultados posibles, y la diferencia importa:
     #  - correcto: ubique las dos paradas y la bajada viene despues de la subida
@@ -189,6 +249,9 @@ def parada_correcta(nombre_linea, subida, bajada):
                     mejor = {
                         "nombre": p["nombre"],
                         "ochava": p["ochava"],
+                        "id_parada": p["id_parada"],
+                        "latitud": p["latitud"],
+                        "longitud": p["longitud"],
                         "metros": round(metros),
                         "cuadras": round(metros / METROS_POR_CUADRA),
                     }
@@ -251,15 +314,32 @@ def buscar_viajes(origen_lat, origen_lon, destino_lat, destino_lon, max_opciones
                 bajada = coordenadas(paradas.get("arrivalStop"))
 
                 estado = verificar_sentido(nombre, subida, bajada)
+                sugerida = parada_correcta(nombre, subida, bajada) if estado == "sentido_invertido" else None
+
+                nombre_google = (paradas.get("departureStop") or {}).get("name")
+                nombre_bajada = (paradas.get("arrivalStop") or {}).get("name")
+
+                subida_desc = describir_parada(nombre_google, subida)
+                bajada_desc = describir_parada(nombre_bajada, bajada)
+
                 tramos.append({
                     "linea": nombre,
-                    "parada_subida": (paradas.get("departureStop") or {}).get("name"),
-                    "parada_bajada": (paradas.get("arrivalStop") or {}).get("name"),
+                    "parada_subida": sugerida["nombre"] if sugerida else subida_desc["nombre"],
+                    "parada_subida_ochava": sugerida["ochava"] if sugerida else None,
+                    "parada_subida_es_codigo": False if sugerida else subida_desc["es_codigo"],
+                    "parada_subida_referencia": None if sugerida else subida_desc["referencia"],
+                    "parada_corregida": bool(sugerida),
+                    "parada_que_decia_google": nombre_google if sugerida else None,
+                    "parada_bajada": bajada_desc["nombre"],
+                    "parada_bajada_es_codigo": bajada_desc["es_codigo"],
+                    "parada_bajada_referencia": bajada_desc["referencia"],
                     "sale": horarios.get("departureTime", {}).get("time", {}).get("text"),
                     "llega": horarios.get("arrivalTime", {}).get("time", {}).get("text"),
                     "sentido_verificado": estado,
-                    "parada_sugerida": parada_correcta(nombre, subida, bajada)
-                                       if estado == "sentido_invertido" else None,
+                    # Si la parada fue corregida, el arribo se pide en la
+                    # corregida y no en la que daba Google.
+                    "id_parada_municipal": (sugerida["id_parada"] if sugerida
+                                            else id_parada_municipal(nombre, subida)),
                 })
 
         if not tramos:
@@ -280,7 +360,7 @@ def buscar_viajes(origen_lat, origen_lon, destino_lat, destino_lon, max_opciones
             ),
             "invertidos_sin_arreglo": sum(
                 1 for t in tramos
-                if t["sentido_verificado"] == "sentido_invertido" and not t["parada_sugerida"]
+                if t["sentido_verificado"] == "sentido_invertido" and not t["parada_corregida"]
             ),
         })
 
@@ -318,13 +398,13 @@ def imprimir(resultado):
               f"{o['cuadras_a_pie_total']} cuadras a pie{marca}")
 
         for t in o["tramos"]:
-            estado = {"correcto": "ok", "sentido_invertido": "INVERTIDO",
+            estado = {"correcto": "ok", "sentido_invertido": "corregida",
                       "no_verificable": "sin verificar"}[t["sentido_verificado"]]
             print(f"   {t['linea']}: {t['parada_subida']} ({t['sale']}) -> "
                   f"{t['parada_bajada']} ({t['llega']})  [{estado}]")
-            if t["parada_sugerida"]:
-                s = t["parada_sugerida"]
-                print(f"      -> tomalo en {s['nombre']} [{s['ochava']}], a {s['cuadras']} cuadra(s)")
+            if t["parada_corregida"]:
+                print(f"      (Google decía {t['parada_que_decia_google']}, "
+                      f"ahí el colectivo va para el otro lado)")
 
 
 def main():
