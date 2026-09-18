@@ -7,7 +7,7 @@ from openai import OpenAI
 
 RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(RAIZ_PROYECTO, "scripts"))
-
+from agenda.consultar_agenda import consultar_agenda
 from clima.clima import obtener_clima
 from monedas.monedas import obtener_cotizaciones
 from colectivos.resolver_ubicacion import (
@@ -37,6 +37,7 @@ FUNCIONES_DISPONIBLES = {
     "buscar_lugares": buscar_lugares_registrado,
     "proximos_colectivos": proximos_colectivos_resuelto,
     "planificar_viaje": planificar_viaje_resuelto,
+    "consultar_agenda": consultar_agenda,
 }
 
 TOOLS = [
@@ -143,17 +144,57 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_agenda",
+            "description": (
+                "Eventos y actividades culturales de Rosario: recitales, teatro, muestras, "
+                "talleres, ferias, visitas guiadas. Filtra por fecha, categoría, texto libre "
+                "y si es gratis."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fecha": {
+                        "type": "string",
+                        "description": "hoy, mañana, finde, esta semana, este mes, o una fecha tipo 2026-09-20",
+                    },
+                    "categoria": {
+                        "type": "string",
+                        "description": (
+                            "Tipo de actividad (Música, Teatro, Muestras, Talleres, Danza...) "
+                            "o distrito (Centro, Sur, Noroeste...). Si no existe, la herramienta "
+                            "devuelve la lista de las que hay."
+                        ),
+                    },
+                    "busqueda": {
+                        "type": "string",
+                        "description": (
+                            "Texto libre que busca en el título, la descripción y el lugar. "
+                            "Usalo para cosas puntuales: 'tango', 'para chicos', 'Fontanarrosa'."
+                        ),
+                    },
+                    "solo_gratis": {"type": "boolean"},
+                    "limite": {"type": "integer"},
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 
 # Palabras que casi siempre piden un dato concreto. Con tool_choice="required" el modelo no puede contestar de memoria.
 PALABRAS_CLAVE_DATOS = (
-    "colectivo", "cole", "linea", "línea", "parada", "bondi", "llego", "llegar",
-    "ir a", "voy a", "viaje", "viajar", "llevame", "llévame", "desde", "hasta",
-    "cómo voy", "como voy", "clima", "tiempo", "lluvia", "llueve", "temperatura",
-    "grados", "pronostico", "pronóstico", "dolar", "dólar", "blue", "mep", "euro",
+    "colectivo", "cole", "linea", "línea", "parada", "bondi", "llego", "llegar", "muestra",
+    "ir a", "voy a", "viaje", "viajar", "llevame", "llévame", "desde", "hasta", "taller",
+    "cómo voy", "como voy", "clima", "tiempo", "lluvia", "llueve", "temperatura", "teatro",
+    "grados", "pronostico", "pronóstico", "dolar", "dólar", "blue", "mep", "euro", "festival",
     "real", "cotizacion", "cotización", "bar", "farmacia", "super", "cafe", "café",
-    "restaurante", "banco", "cajero", "abierto", "cerca",
+    "restaurante", "banco", "cajero", "abierto", "cerca", "evento", "agenda", "recital",    
+    "actividad", "actividades", "hacer", "obra", "feria", "concierto", "show",
+    "gratis", "cultural",
 )
 
 # Las lineas de Rosario van de 100 a 153, mas algunas de dos digitos. Un \d{2,4} suelto tambien pescaba años y alturas forzando una llamada.
