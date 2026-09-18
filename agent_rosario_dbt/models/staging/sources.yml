@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: rosario_vivo
+    database: agent-rosario
+    schema: rosario_vivo
+    description: Tablas crudas que cargan los pipelines de extraccion.
+
+    tables:
+      - name: raw_agenda
+        description: >
+          Agenda cultural de rosario.gob.ar, una fila por evento. La carga
+          reemplaza la tabla entera en cada corrida, asi que solo hay la foto
+          de la ultima extraccion.
+        columns:
+          - name: slug
+            description: Identificador del evento en la URL del municipio.
+            data_tests:
+              - unique
+              - not_null
+          - name: fecha_inicio
+            data_tests:
+              - not_null
+          - name: fecha_extraccion
+            description: Cuando se scrapearon estos datos.
+            data_tests:
+              - not_null
