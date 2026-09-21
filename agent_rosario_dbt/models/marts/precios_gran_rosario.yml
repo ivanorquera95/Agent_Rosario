@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: precios_gran_rosario
+    description: >
+      Una fila por producto y sucursal, con el comercio y la ubicacion ya
+      resueltos. Desnormalizada a proposito: son 159 mil filas, y asi el
+      agente contesta "donde esta mas barata la leche" con un solo select,
+      sin tener que acertar tres joins.
+    columns:
+      - name: clave_precio
+        description: id_comercio + id_sucursal + id_producto.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: precio_efectivo
+        description: >
+          El menor entre precio de lista y promocion. Es el que hay que usar
+          para comparar; precio_lista sirve para mostrar el descuento.
+        data_tests:
+          - not_null
+
+      - name: comercio
+        description: >
+          Nombre de bandera. Si aparece nulo, el join contra comercios fallo:
+          hay una bandera en precios que no esta en la tabla de comercios.
+        data_tests:
+          - not_null
+
+      - name: sucursal
+        description: >
+          Si aparece nulo, hay precios de una sucursal que no quedo en el
+          filtro del Gran Rosario, o sea que el filtro y la carga se
+          desincronizaron.
+        data_tests:
+          - not_null
+
+      - name: localidad
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Rosario', 'Funes', 'Villa Gobernador Gálvez', 'Arroyo Seco']
+                quote: true

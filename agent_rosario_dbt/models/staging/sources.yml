@@ -25,3 +25,65 @@ sources:
             description: Cuando se scrapearon estos datos.
             data_tests:
               - not_null
+
+      - name: raw_precios_productos
+        description: >
+          Precios de SEPA filtrados al Gran Rosario, una fila por producto y
+          sucursal. Del dataset nacional (14,7 millones de filas) queda el 1%:
+          las 21 sucursales del area. La clave es (id_comercio, id_sucursal,
+          id_producto).
+        columns:
+          - name: id_comercio
+            data_tests:
+              - not_null
+          - name: id_sucursal
+            data_tests:
+              - not_null
+          - name: id_producto
+            description: >
+              Es el codigo de barras (EAN-13), no un id interno del comercio.
+              Por eso el mismo producto se puede comparar entre cadenas. Va
+              como texto: convertido a numero pierde los ceros de la izquierda.
+            data_tests:
+              - not_null
+          - name: precio_lista
+            data_tests:
+              - not_null
+
+      - name: raw_precios_sucursales
+        description: >
+          Las 21 sucursales del Gran Rosario. Se eligen por coordenadas y no
+          por nombre: SEPA carga barrios ("Fisherton", "Paternal") en el campo
+          de localidad, asi que el nombre no alcanza para decidir.
+        columns:
+          - name: id_sucursal
+            data_tests:
+              - not_null
+          - name: id_comercio
+            data_tests:
+              - not_null
+
+      - name: raw_precios_comercios
+        description: >
+          Cadenas y sus banderas. La clave es (id_comercio, id_bandera): el
+          comercio 10 son Carrefour, Maxi, Express y Market a la vez.
+        columns:
+          - name: id_comercio
+            data_tests:
+              - not_null
+      
+      - name: raw_descuentos
+        description: >
+          Promociones y descuentos de las cadenas del Gran Rosario, una
+          fila por promocion. Sale de cinco fuentes distintas:
+          descuentito-data (Carrefour, DIA, Jumbo), la API propia de Coto
+          y las webs de La Gallega y La Reina. Los dias, las entidades y
+          los medios de pago son arrays. El porcentaje puede venir nulo:
+          La Reina publica el numero dentro de la imagen de la promo y no
+          en el texto, asi que preferimos no saberlo antes que inventarlo.
+        columns:
+          - name: clave_descuento
+            description: Hash de la promo, unico por fuente y lugar.
+            tests:
+              - unique
+              - not_null

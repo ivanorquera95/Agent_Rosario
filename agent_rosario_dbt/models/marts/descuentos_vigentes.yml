@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: descuentos_vigentes
+    description: >
+      Una fila por promocion vigente en las cadenas del Gran Rosario.
+      Los dias, las entidades y los medios de pago son arrays, asi que
+      se consultan con unnest.
+    columns:
+      - name: clave_descuento
+        tests:
+          - unique
+          - not_null
+      - name: cadena
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Carrefour', 'Coto', 'DIA', 'Jumbo', 'La Gallega', 'La Reina']
+      - name: tipo_beneficio
+        description: >
+          'descuento' o 'cuotas'. Puede ser nulo cuando la fuente publica
+          el numero dentro de una imagen en vez de en el texto.
+        tests:
+          - accepted_values:
+              values: ['descuento', 'cuotas']
+              config:
+                where: "tipo_beneficio is not null"

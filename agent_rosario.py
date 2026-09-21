@@ -2,12 +2,18 @@ import os
 import sys
 import json
 import re
+import unicodedata
 from dotenv import load_dotenv
 from openai import OpenAI
 
 RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(RAIZ_PROYECTO, "scripts"))
 from agenda.consultar_agenda import consultar_agenda
+from precios.consultar_precios import (
+    buscar_precios,
+    comparar_producto,
+)
+from descuentos.consultar_descuentos import consultar_descuentos
 from clima.clima import obtener_clima
 from monedas.monedas import obtener_cotizaciones
 from colectivos.resolver_ubicacion import (
@@ -30,6 +36,49 @@ MAX_MENSAJES_HISTORIAL = 40
 with open(os.path.join(RAIZ_PROYECTO, "rosario.md"), encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
+def sin_acentos(texto):
+    d = unicodedata.normalize("NFD", texto or "")
+    return "".join(c for c in d if unicodedata.category(c) != "Mn").lower()
+# Guardia contra productos inventados, hermana de la de direcciones.
+# Ante "que conviene hoy" el modelo llama buscar_precios con "leche",
+# "yerba" y "fideos" —que el usuario nunca nombro— y contesta como si
+# esa fuera la pregunta. Si ninguna palabra del producto aparece en lo
+# que escribio, la herramienta no corre y se le dice cual usar.
+mensaje_actual = ""
+
+
+def set_mensaje_precios(texto):
+    global mensaje_actual
+    mensaje_actual = texto
+
+
+def buscar_precios_verificado(producto=None, **resto):
+    escrito = sin_acentos(mensaje_actual)
+    palabras = [p for p in sin_acentos(producto).split() if len(p) > 2]
+
+    if palabras and not any(p in escrito for p in palabras):
+        return {
+            "error": f"El usuario no nombró '{producto}'.",
+            "instruccion_para_el_agente": (
+                "NO inventes productos. Si la pregunta es general sobre qué conviene, "
+                "qué descuentos o promociones hay, usá consultar_descuentos. Si querés "
+                "precios, preguntale al usuario qué producto le interesa. "
+                "NO le menciones al usuario que intentaste buscar un producto: no lo pidió."
+            ),
+        }
+
+    return buscar_precios(producto=producto, **resto)
+
+def consultar_descuentos_verificado(cadena=None, **resto):
+    # El modelo tiende a llamar una vez por cadena aunque el usuario no
+    # haya nombrado ninguna: preguntó por Banco Nación y la llamó tres
+    # veces, con Coto, Jumbo y DIA. Sin el filtro de cadena la herramienta
+    # ya devuelve todas juntas, asi que una cadena que el usuario no
+    # escribió se descarta.
+    if cadena and sin_acentos(cadena) not in sin_acentos(mensaje_actual):
+        cadena = None
+    return consultar_descuentos(cadena=cadena, **resto)
+
 # Lugares y colectivos NO apuntan a las funciones crudas: van a los wrappers de resolver_ubicacion.py, que resuelven nombres a direcciones y frenan las direcciones inventadas.
 FUNCIONES_DISPONIBLES = {
     "obtener_clima": obtener_clima,
@@ -38,7 +87,11 @@ FUNCIONES_DISPONIBLES = {
     "proximos_colectivos": proximos_colectivos_resuelto,
     "planificar_viaje": planificar_viaje_resuelto,
     "consultar_agenda": consultar_agenda,
+    "buscar_precios": buscar_precios_verificado,
+    "comparar_producto": comparar_producto,
+    "consultar_descuentos": consultar_descuentos_verificado,
 }
+
 
 TOOLS = [
     {
@@ -182,6 +235,105 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_precios",
+            "description": (
+                "Precios de un producto CONCRETO que el usuario nombró: 'leche', "
+                "'yerba', 'fideos matarazzo'. Los resultados vienen ordenados por "
+                "precio por el precio del envase. "
+                "NO la uses si el usuario no nombró ningún producto: para '¿qué "
+                "conviene hoy?', '¿qué descuentos hay?' o '¿dónde compro más barato?' "
+                "la herramienta correcta es consultar_descuentos. "
+                "Para comparar un producto puntual entre cadenas usá comparar_producto."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "producto": {
+                        "type": "string",
+                        "description": (
+                            "Qué busca el usuario: 'leche', 'yerba', 'fideos matarazzo'. "
+                            "Palabras sueltas, no una frase larga."
+                        ),
+                    },
+                    "comercio": {
+                        "type": "string",
+                        "description": "Filtrar por cadena: Coto, Carrefour, DIA, La Anonima, Vea",
+                    },
+                    "localidad": {
+                        "type": "string",
+                        "description": "Rosario, Funes, Villa Gobernador Gálvez o Arroyo Seco",
+                    },
+                    "solo_promos": {"type": "boolean"},
+                    "limite": {"type": "integer"},
+                },
+                "required": ["producto"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "comparar_producto",
+            "description": (
+                "El MISMO producto en todas las cadenas que lo tengan, comparado por "
+                "código de barras. Usala cuando el usuario quiere saber dónde conviene "
+                "comprar algo puntual, o si le conviene cambiar de supermercado."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "producto": {
+                        "type": "string",
+                        "description": "El producto puntual: 'coca cola 2.25', 'arroz gallo oro'",
+                    },
+                },
+                "required": ["producto"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_descuentos",
+            "description": (
+                "Descuentos y reintegros de supermercados del Gran Rosario por banco, "
+                "billetera virtual, día de la semana o condición (jubilados, ANSES, PAMI). "
+                "Cubre Carrefour, Coto, DIA, Jumbo, La Gallega y La Reina. Llamala SIEMPRE "
+                "que pregunten por descuentos, aunque creas saber la respuesta. "
+                "Por defecto NO trae cuotas sin interés: eso es para electro, no para la "
+                "compra del súper."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entidad": {
+                        "type": "string",
+                        "description": (
+                            "Banco, billetera o condición: 'personal pay', 'credicoop', "
+                            "'mercado pago', 'modo', 'naranja x', 'jubilados', 'anses'"
+                        ),
+                    },
+                    "cadena": {
+                        "type": "string",
+                        "description": "Carrefour, Coto, DIA, Jumbo, La Gallega o La Reina",
+                    },
+                    "dia": {
+                        "type": "string",
+                        "description": "hoy, mañana, o un día: lunes, martes, miércoles...",
+                    },
+                    "incluir_cuotas": {
+                        "type": "boolean",
+                        "description": "True solo si preguntan por cuotas sin interés",
+                    },
+                    "limite": {"type": "integer"},
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 
@@ -194,7 +346,14 @@ PALABRAS_CLAVE_DATOS = (
     "real", "cotizacion", "cotización", "bar", "farmacia", "super", "cafe", "café",
     "restaurante", "banco", "cajero", "abierto", "cerca", "evento", "agenda", "recital",    
     "actividad", "actividades", "hacer", "obra", "feria", "concierto", "show",
-    "gratis", "cultural",
+    "gratis", "cultural", "precio", "precios", "barato", "barata", "baratos", "caro", "cuesta",
+    "cuanto sale", "cuánto sale", "cuanto vale", "cuánto vale",
+    "descuento", "descuentos", "promo", "promos", "promocion", "promoción",
+    "oferta", "ofertas", "comparar", "conviene", "jubilado", "jubilados",
+    "billetera", "supermercado", "changuito", "canasta",
+    "reintegro", "reintegros", "personal pay", "mercado pago", "modo",
+    "credicoop", "naranja", "cuenta dni", "anses", "pami", "plus pagos",
+    "tarjeta", "debito", "débito", "credito", "crédito",
 )
 
 # Las lineas de Rosario van de 100 a 153, mas algunas de dos digitos. Un \d{2,4} suelto tambien pescaba años y alturas forzando una llamada.
@@ -328,6 +487,7 @@ def main():
 
         # La guardia anti-direccion-inventada necesita saber que escribio el usuario para poder comparar contra los argumentos del modelo.
         set_mensaje_usuario(entrada)
+        set_mensaje_precios(entrada)
         historial = podar_historial(historial)
         historial.append({"role": "user", "content": entrada})
         historial = preguntar_al_agente(historial)
