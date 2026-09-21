@@ -9,6 +9,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 from google.cloud import vision
+import shutil
 
 URL = "https://www.lareinaweb.com.ar/"
 AGENTE = "RosarioVivo/1.0 (proyecto de portfolio)"
@@ -153,7 +154,16 @@ def porcentaje_del_texto(texto: str) -> int | None:
 
 
 def leer_las_imagenes(datos: dict) -> tuple[int, int]:
+    # Las imagenes se borran y se vuelven a bajar en cada corrida. Como
+    # se guardan con el id de la promo por nombre (PROMO_1.webp), si la
+    # cadena cambia la promo 1 el archivo viejo seguiria ahi y el OCR
+    # leeria el cartel del mes pasado: un descuento vencido publicado
+    # como si fuera el de hoy. Son quince imagenes, bajarlas de nuevo
+    # cuesta segundos.
+    if IMAGENES.exists():
+        shutil.rmtree(IMAGENES)
     IMAGENES.mkdir(parents=True, exist_ok=True)
+
     print("\nleyendo las imagenes con Vision:")
 
     coinciden = discrepan = 0
