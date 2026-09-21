@@ -13,8 +13,8 @@ select
     entidades,
     medios_pago,
     dias,
-    date(vigencia_desde) as vigencia_desde,
-    date(vigencia_hasta) as vigencia_hasta,
+    parse_date('%Y-%m-%d', vigencia_desde) as vigencia_desde,
+    parse_date('%Y-%m-%d', vigencia_hasta) as vigencia_hasta,
     tope,
     sin_tope,
     donde,
@@ -22,5 +22,5 @@ select
     texto_imagen,
     excluye,
     url,
-    date(fecha_extraccion) as fecha_extraccion
+    parse_date('%Y-%m-%d', fecha_extraccion) as fecha_extraccion
 from crudo

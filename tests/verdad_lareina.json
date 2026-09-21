@@ -1,0 +1,17 @@
+{
+  "PROMO 1":  {"porcentajes": [10],         "dias": ["Sabado"]},
+  "PROMO 2":  {"porcentajes": [20],         "dias": ["Viernes"]},
+  "PROMO 3":  {"porcentajes": [30],         "dias": ["Miercoles"]},
+  "PROMO 4":  {"porcentajes": [20, 25, 30], "dias": ["Martes"]},
+  "PROMO 5":  {"porcentajes": [20],         "dias": ["Viernes"]},
+  "PROMO 6":  {"porcentajes": [10],         "dias": ["Martes", "Jueves"]},
+  "PROMO 7":  {"porcentajes": [10],         "dias": ["Lunes", "Martes"]},
+  "PROMO 8":  {"porcentajes": [15],         "dias": ["Lunes"]},
+  "PROMO 9":  {"porcentajes": [20],         "dias": ["Todos"]},
+  "PROMO 10": {"porcentajes": [20],         "dias": ["Todos"]},
+  "PROMO 11": {"porcentajes": [20],         "dias": ["Martes"]},
+  "PROMO 12": {"porcentajes": [25],         "dias": ["Lunes"]},
+  "PROMO 13": {"porcentajes": [],           "dias": ["Todos"], "cuotas": 4},
+  "PROMO 14": {"porcentajes": [],           "dias": ["Lunes"], "cuotas": 3},
+  "PROMO 15": {"porcentajes": [30, 40],     "dias": ["Sabado"]}
+}

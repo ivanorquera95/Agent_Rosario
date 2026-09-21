@@ -1,0 +1,70 @@
+# Airflow con LocalExecutor: un solo contenedor corre las tareas, sin
+# Celery ni Redis. Para cuatro DAGs que se ejecutan una vez por dia es de
+# sobra, y evita tres servicios mas que no aportan nada al proyecto.
+
+x-comun: &comun
+  build: .
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    # Los scripts usan rutas relativas (data/raw/...), asi que todo corre
+    # parado en la raiz del proyecto.
+    PYTHONPATH: /opt/proyecto/scripts
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp/credentials.json
+    GOOGLE_CLOUD_PROJECT: agent-rosario
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ${DBT_PROFILES}:/home/airflow/.dbt:ro
+    # El proyecto entero, para que los scripts escriban en data/ y dbt
+    # encuentre sus modelos.
+    - ../:/opt/proyecto
+    # Las credenciales de tu maquina, de solo lectura.
+    - ${GCP_CREDENCIALES}:/opt/airflow/gcp/credentials.json:ro
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+
+  init:
+    <<: *comun
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname Ivan --lastname Orquera --role Admin --email ivanorquera9@gmail.com \
+          || true
+    restart: "no"
+
+  webserver:
+    <<: *comun
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+
+  scheduler:
+    <<: *comun
+    command: scheduler
+    restart: always
+
+volumes:
+  postgres-db:

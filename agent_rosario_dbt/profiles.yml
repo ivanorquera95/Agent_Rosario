@@ -1,0 +1,13 @@
+agent_rosario_dbt:
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: agent-rosario
+      dataset: rosario_vivo
+      location: southamerica-east1
+      threads: 4
+      priority: interactive
+      job_retries: 1
+      job_execution_timeout_seconds: 300
+  target: dev

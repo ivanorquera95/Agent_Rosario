@@ -535,9 +535,17 @@ def main() -> None:
     df["porcentaje"] = df["porcentaje"].astype("Int64")
     df["cuotas"] = df["cuotas"].astype("Int64")
     df["tope"] = df["tope"].astype("Int64")
-    df["vigencia_desde"] = pd.to_datetime(df["vigencia_desde"], errors="coerce")
-    df["vigencia_hasta"] = pd.to_datetime(df["vigencia_hasta"], errors="coerce")
-    df["fecha_extraccion"] = pd.to_datetime(df["fecha_extraccion"])
+    # Las fechas viajan como texto ISO y se convierten en dbt. Dejarlas
+    # como datetime hacia que el tipo dependiera de que version de pandas
+    # y pyarrow escribiera el parquet: corriendo la limpieza dentro del
+    # contenedor de Airflow, BigQuery las leyo como INT64 y dbt no pudo
+    # castearlas. Con texto el resultado es identico en todos lados.
+    for columna in ("vigencia_desde", "vigencia_hasta", "fecha_extraccion"):
+        df[columna] = (
+            pd.to_datetime(df[columna], errors="coerce").dt.strftime("%Y-%m-%d")
+        )
+
+    df["porcentaje_de_imagen"] = df["porcentaje_de_imagen"].fillna(False).astype(bool)
 
     DESTINO.mkdir(parents=True, exist_ok=True)
     archivo = DESTINO / "descuentos.parquet"

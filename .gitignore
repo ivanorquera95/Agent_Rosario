@@ -27,3 +27,9 @@ logs/
 
 # sistema
 .DS_Store
+
+# el set de verdad del OCR si va: es con lo que se mide la extraccion
+!tests/verdad_lareina.json
+
+# dbt: identificador local del usuario
+agent_rosario_dbt/.user.yml
