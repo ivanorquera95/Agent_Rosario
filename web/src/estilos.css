@@ -1,10 +1,80 @@
-/* ---------------------------------------------------------------- Anillos */
+/* ------------------------------------------------------------------ Pagina */
+
+.app {
+  height: 100vh;
+  height: 100dvh; /* en el celular descuenta la barra del navegador */
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --------------------------------------------------------- Barra superior */
+
+.barra {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #1d3346;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  color: #7fa7c4;
+}
+
+.reloj {
+  color: #4fd1ff;
+  font-variant-numeric: tabular-nums; /* los numeros no bailan al cambiar */
+}
+
+/* ----------------------------------------------------- Nucleo e indicador */
+
+.nucleo-zona {
+  flex: none;
+  padding-top: 0.75rem;
+}
+
+.indicador {
+  margin: 0.25rem 0 0.75rem;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: #7fa7c4;
+}
+
+.indicador .punto {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 6px #3ddc84;
+}
+
+.indicador.pensando .punto,
+.indicador.hablando .punto {
+  background: #ffb347;
+  box-shadow: 0 0 6px #ffb347;
+  animation: parpadeo 1s ease-in-out infinite;
+}
+
+@keyframes parpadeo {
+  50% { opacity: 0.3; }
+}
+
+/* ----------------------------------------------------------------- Anillos */
 
 .anillos {
   --color: #4fd1ff; /* celeste: reposo */
   display: block;
-  width: min(70vw, 260px);
-  margin: 0 auto 1rem;
+  /* Crece con el alto de la pantalla, sin pasarse del ancho ni de 320px. */
+  width: min(30vh, 60vw, 320px);
+  margin: 0 auto;
   filter: drop-shadow(0 0 4px var(--color));
   transition: filter 0.6s;
 }
@@ -28,8 +98,7 @@
 
 .anillos text {
   fill: var(--color);
-  font-size: 13px;
-  letter-spacing: 3px;
+  font-size: 11px;
   transition: fill 0.6s;
 }
 
@@ -48,8 +117,7 @@
 .anillo-5 { animation: girar 20s linear infinite reverse; }
 
 /* Giro extra, que se suma al base al pensar o hablar. En reposo se PAUSA en
-   vez de sacarse: asi el anillo queda donde estaba y no salta de posicion al
-   cambiar de estado. */
+   vez de sacarse: asi el anillo queda donde estaba y no salta de posicion. */
 .anillo-1 .extra { animation: girar 8s linear infinite; }
 .anillo-2 .extra { animation: girar 6s linear infinite reverse; }
 .anillo-4 .extra { animation: girar 5s linear infinite; }
@@ -72,10 +140,158 @@
   50% { transform: scale(1.04); }
 }
 
-/* Si la persona pidio "reducir movimiento" en su sistema, los anillos quedan quietos. */
+/* ------------------------------------------------------- Chat tipo terminal */
+
+.mensajes {
+  flex: 1;
+  min-height: 0; /* sin esto, un hijo con scroll dentro de un flex no se achica */
+  overflow-y: auto;
+  margin: 0 1rem;
+  padding: 0.75rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  background: rgba(11, 18, 30, 0.85);
+  border: 1px solid #1d3346;
+  border-radius: 6px;
+}
+
+.vacio {
+  color: #7fa7c4;
+  margin: 0;
+}
+
+.mensaje {
+  margin: 0.6rem 0;
+  white-space: pre-wrap; /* respeta los saltos de linea de las respuestas */
+  overflow-wrap: anywhere; /* una URL larga no rompe el ancho */
+}
+
+.mensaje.user {
+  color: #4fd1ff;
+}
+
+.mensaje.user::before {
+  content: '> ';
+}
+
+.mensaje.assistant {
+  color: #d7e3f0;
+  padding-left: 0.75rem;
+  border-left: 2px solid #1d3346;
+}
+
+/* -------------------------------------------------------------------- Pie */
+
+.pie {
+  flex: none;
+  padding: 0.75rem 1rem;
+}
+
+.error {
+  color: #ff6b6b;
+  margin: 0 0 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.caja {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.caja input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 16px; /* con menos, el iPhone hace zoom al tocar la caja */
+  color: inherit;
+  background: rgba(11, 18, 30, 0.85);
+  border: 1px solid #1d3346;
+  border-radius: 6px;
+}
+
+.caja input:focus {
+  outline: 2px solid #4fd1ff;
+  outline-offset: 1px;
+}
+
+.caja button {
+  padding: 0 1.1rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  color: #4fd1ff;
+  background: transparent;
+  border: 1px solid #4fd1ff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.caja button:hover:not(:disabled) {
+  background: rgba(79, 209, 255, 0.1);
+}
+
+.pie-extra {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #7fa7c4;
+}
+
+.nueva {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  color: #c9d4e3;
+  white-space: nowrap;
+  background: none;
+  border: 1px solid #1d3346;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.caja button:disabled,
+.nueva:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Invisible en pantalla pero lo leen los lectores de pantalla. */
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------ Reducir movimiento */
+
+/* Si la persona pidio "reducir movimiento" en su sistema, nada se mueve. */
 @media (prefers-reduced-motion: reduce) {
   .anillos,
-  .anillos * {
+  .anillos *,
+  .indicador .punto {
     animation: none !important;
+  }
+}
+
+/* ----------------------------------------------------------------- Celular */
+
+@media (max-width: 600px) {
+  .barra {
+    font-size: 0.7rem;
+  }
+
+  .mensajes {
+    margin: 0 0.5rem;
+  }
+
+  .pie {
+    padding: 0.5rem;
   }
 }

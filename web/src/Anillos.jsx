@@ -10,7 +10,7 @@ const ANILLOS = [
 
 export default function Anillos({ estado }) {
   return (
-    <svg className={`anillos ${estado}`} viewBox="0 0 200 200" role="img" aria-label={`Rosario: ${estado}`}>
+    <svg className={`anillos ${estado}`} viewBox="-12 -12 224 224" role="img" aria-label={`Rosario: ${estado}`}>
       <g className="conjunto">
         {ANILLOS.map((a) => (
           <g key={a.clase} className={`anillo ${a.clase}`}>
@@ -20,7 +20,7 @@ export default function Anillos({ estado }) {
           </g>
         ))}
         <circle className="nucleo" cx="100" cy="100" r="34" />
-        <text x="100" y="100" textAnchor="middle" dominantBaseline="central">
+        <text x="100" y="100" textAnchor="middle" dominantBaseline="central" textLength="56" lengthAdjust="spacingAndGlyphs">
           ROSARIO
         </text>
       </g>
