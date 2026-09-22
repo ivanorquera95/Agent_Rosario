@@ -144,7 +144,28 @@ def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, l
     # quien gana, en vez de esperar que lo deduzca.
     comparables = [f for f in filas if f.precio_por_unidad is not None]
     ganador = min(comparables, key=lambda f: f.precio_por_unidad) if comparables else None
-
+    # El modelo agrupaba por marca ("Casanto", "Ilolay") como si fueran
+    # supermercados. Se entrega ya agrupado. El orden de los grupos es el de la
+    # consulta: primero el supermercado con el mejor resultado.
+    por_supermercado = {}
+    for fila in filas:
+        por_supermercado.setdefault(fila.comercio, []).append({
+            "producto": fila.descripcion,
+            "marca": fila.marca,
+            "presentacion": f"{fila.cantidad_presentacion} {fila.unidad_presentacion}",
+            "precio": fila.precio_efectivo,
+            "precio_por_unidad": fila.precio_por_unidad,
+            "unidad": fila.unidad_comparable,
+            "unidad_referencia": fila.unidad_referencia,
+            "precio_lista": fila.precio_lista,
+            "tiene_promo": fila.tiene_promo,
+            "promo": fila.leyenda_promo1,
+            "sucursal": fila.sucursal,
+            "direccion": fila.sucursal_direccion,
+            "localidad": fila.localidad,
+            "codigo_barras": fila.id_producto,
+        })
+        
     return {
         "busqueda": producto,
         "filtros": {"comercio": comercio, "localidad": localidad,
@@ -158,7 +179,7 @@ def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, l
                  "con la góndola de hoy.",
         "mas_barato_por_unidad": {
             "producto": ganador.descripcion,
-            "comercio": ganador.comercio,
+            "supermercado": ganador.comercio,
             "precio_por_unidad": ganador.precio_por_unidad,
             "unidad": ganador.unidad_comparable,
             "precio_envase": ganador.precio_efectivo,
@@ -170,27 +191,10 @@ def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, l
             "'precio': ese es el precio del envase, y un envase más chico "
             "siempre cuesta menos sin ser más barato."
         ),
-        "resultados": [
-            
-            {
-                "producto": fila.descripcion,
-                "marca": fila.marca,
-                "presentacion": f"{fila.cantidad_presentacion} {fila.unidad_presentacion}",
-                "precio": fila.precio_efectivo,
-                "precio_por_unidad": fila.precio_por_unidad,
-                "unidad": fila.unidad_comparable,
-                "unidad_referencia": fila.unidad_referencia,
-                "precio_lista": fila.precio_lista,
-                "tiene_promo": fila.tiene_promo,
-                "promo": fila.leyenda_promo1,
-                "comercio": fila.comercio,
-                "sucursal": fila.sucursal,
-                "direccion": fila.sucursal_direccion,
-                "localidad": fila.localidad,
-                "codigo_barras": fila.id_producto,
-            }
-            for fila in filas
-        ],
+        "por_supermercado": [
+              {"supermercado": nombre, "productos": productos}
+              for nombre, productos in por_supermercado.items()
+          ],
     }
 
 
@@ -299,12 +303,13 @@ def mostrar(resultado):
 
     print(f"  {resultado['total_coincidencias']} coincidencia(s), "
           f"mostrando {resultado['mostrados']}  (ordenado por precio por unidad)")
-    for r in resultado["resultados"]:
-        promo = "  [promo]" if r["tiene_promo"] else ""
-        unidad = (f"${r['precio_por_unidad']:>9,.2f}/{r['unidad']}"
-                  if r["precio_por_unidad"] else "        s/d")
-        print(f"    {unidad}   ${r['precio']:>9,.2f}  {r['comercio']:<22} "
-              f"{r['producto'][:38]}{promo}")
+    for grupo in resultado["por_supermercado"]:
+        print(f"  {grupo['supermercado']}")
+        for r in grupo["productos"]:
+            promo = "  [promo]" if r["tiene_promo"] else ""
+            unidad = (f"${r['precio_por_unidad']:>9,.2f}/{r['unidad']}"
+                      if r["precio_por_unidad"] else "        s/d")
+            print(f"    {unidad}   ${r['precio']:>9,.2f}  {r['producto'][:50]}{promo}")
 
 
 if __name__ == "__main__":
