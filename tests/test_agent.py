@@ -1,6 +1,9 @@
 # El ciclo del agente no se puede caer por culpa del modelo: cualquier falla
 # al ejecutar una herramienta tiene que volver como error, no como excepcion.
 from agent_rosario import ejecutar_herramienta
+import pytest
+from agent_rosario import detectar_dia_pedido
+from agent_rosario import requiere_tool_choice_forzado
 
 
 def test_json_invalido_no_rompe_el_turno():
@@ -18,3 +21,21 @@ def test_parametro_inventado_no_rompe_el_turno():
     # antes de tocar la red.
     r = ejecutar_herramienta("comparar_producto", '{"parametro_inventado": 1}')
     assert "error" in r
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("¿y mañana?", "mañana"),
+    ("¿llueve pasado mañana?", "pasado mañana"),
+    ("¿cómo está hoy a la mañana?", None),
+    ("¿y mañana a la mañana?", "mañana"),
+    ("¿llueve el sábado?", "sabado"),
+    ("¿cómo está el clima?", None),
+])
+def test_detectar_dia_pedido(texto, esperado):
+    assert detectar_dia_pedido(texto) == esperado
+    
+
+
+@pytest.mark.parametrize("texto", ["¿y mañana?", "¿y el sábado?", "¿qué hay para el finde?"])
+def test_seguimientos_de_fecha_fuerzan_herramienta(texto):
+    assert requiere_tool_choice_forzado([{"role": "user", "content": texto}])

@@ -77,9 +77,39 @@ def consultar_descuentos_verificado(cadena=None, **resto):
         cadena = None
     return consultar_descuentos(cadena=cadena, **resto)
 
+# "Mañana" como momento del dia, no como el dia siguiente: "hoy a la mañana".
+FRANJAS_MANANA = ("a la manana", "por la manana", "de la manana", "esta manana")
+DIAS_DE_LA_SEMANA = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
+
+
+def detectar_dia_pedido(texto):
+    t = sin_acentos(texto)
+    for franja in FRANJAS_MANANA:
+        t = t.replace(franja, " ")
+    # Primero "pasado mañana": contiene "mañana" adentro.
+    if "pasado manana" in t:
+        return "pasado mañana"
+    if re.search(r"\bhoy\b", t):
+        return None
+    if re.search(r"\bmanana\b", t):
+        return "mañana"
+    for dia in DIAS_DE_LA_SEMANA:
+        if re.search(rf"\b{dia}\b", t):
+            return dia
+    return None
+
+
+def obtener_clima_verificado(lugar=None, dias=None, desde=None):
+    # Ante "¿y mañana?" el modelo llama con dias=1 y sin 'desde', y la herramienta
+    # devuelve el dia de hoy. Si el usuario nombro un dia y el modelo no lo paso,
+    # se completa aca.
+    if not desde:
+        desde = detectar_dia_pedido(contexto().ultimo_mensaje)
+    return obtener_clima(lugar=lugar, dias=dias, desde=desde)
+
 # Lugares y colectivos NO apuntan a las funciones crudas: van a los wrappers de resolver_ubicacion.py, que resuelven nombres a direcciones y frenan las direcciones inventadas.
 FUNCIONES_DISPONIBLES = {
-    "obtener_clima": obtener_clima,
+    "obtener_clima": obtener_clima_verificado,
     "obtener_cotizaciones": obtener_cotizaciones,
     "buscar_lugares": buscar_lugares_registrado,
     "proximos_colectivos": proximos_colectivos_resuelto,
@@ -166,11 +196,17 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lugar": {"type": "string", "description": "Texto tal cual lo escribió el usuario"},
+                    "lugar": {
+                          "type": "string",
+                          "description": (
+                              "Texto tal cual lo escribió el usuario. Si no dijo dónde está, "
+                              "NO lo pongas: la herramienta te va a indicar que le preguntes."
+                          ),
+                      },
                     "linea": {"type": "string", "description": "Filtrar por número de línea"},
                     "radio_metros": {"type": "integer"},
                 },
-                "required": ["lugar"],
+                "required": [],
             },
         },
     },
@@ -187,11 +223,17 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "origen": {"type": "string", "description": "Texto tal cual lo escribió el usuario"},
+                    "origen": {
+                          "type": "string",
+                          "description": (
+                              "Texto tal cual lo escribió el usuario. Si no dijo de dónde sale, "
+                              "NO lo pongas: la herramienta te va a indicar que le preguntes."
+                          ),
+                      },
                     "destino": {"type": "string", "description": "Texto tal cual lo escribió el usuario"},
                     "max_opciones": {"type": "integer"},
                 },
-                "required": ["origen", "destino"],
+                "required": ["destino"],
             },
         },
     },
@@ -352,6 +394,8 @@ PALABRAS_CLAVE_DATOS = (
     "reintegro", "reintegros", "personal pay", "mercado pago", "modo",
     "credicoop", "naranja", "cuenta dni", "anses", "pami", "plus pagos",
     "tarjeta", "debito", "débito", "credito", "crédito",
+    "mañana", "manana", "lunes", "martes", "miércoles", "miercoles", "jueves",
+    "viernes", "sábado", "sabado", "domingo", "finde", "fin de semana",
 )
 
 # Las lineas de Rosario van de 100 a 153, mas algunas de dos digitos. Un \d{2,4} suelto tambien pescaba años y alturas forzando una llamada.
