@@ -5,6 +5,7 @@ import re
 import unicodedata
 from dotenv import load_dotenv
 from openai import OpenAI
+from openai import OpenAI, APIError
 
 RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(RAIZ_PROYECTO, "scripts"))
@@ -25,7 +26,9 @@ from colectivos.resolver_ubicacion import (
 from comun.contexto import ContextoSesion, contexto, usar_contexto
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Sin timeout, si OpenAI no contesta el turno queda colgado para siempre.
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=30, max_retries=2)
 
 MODELO = "gpt-4o-mini"
 NOMBRE_AGENTE = "Rosario"
@@ -435,45 +438,80 @@ def ejecutar_herramienta(nombre_funcion, argumentos_json):
         return {"error": str(e)}
     
     
-def preguntar_al_agente(mensajes, profundidad=0):
-    if profundidad >= MAX_PROFUNDIDAD:
+def responder_en_stream(mensajes):
+    # Genera eventos a medida que ocurren: 'herramienta', 'texto', 'fin' o 'error'.
+    # La terminal y la API consumen este mismo generador. Al terminar bien,
+    # 'mensajes' queda con la respuesta final agregada.
+    for _ in range(MAX_PROFUNDIDAD):
+        tool_choice = "required" if requiere_tool_choice_forzado(mensajes) else "auto"
+
+        texto = ""
+        # Con stream=True los tool_calls llegan en fragmentos: se juntan por indice.
+        llamadas = {}
+
+        try:
+            stream = client.chat.completions.create(
+                model=MODELO,
+                messages=mensajes,
+                tools=TOOLS,
+                tool_choice=tool_choice,
+                stream=True,
+            )
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+
+                if delta.content:
+                    texto += delta.content
+                    yield {"tipo": "texto", "contenido": delta.content}
+
+                for fragmento in delta.tool_calls or []:
+                    llamada = llamadas.setdefault(fragmento.index, {"id": "", "name": "", "arguments": ""})
+                    if fragmento.id:
+                        llamada["id"] = fragmento.id
+                    if fragmento.function and fragmento.function.name:
+                        llamada["name"] += fragmento.function.name
+                    if fragmento.function and fragmento.function.arguments:
+                        llamada["arguments"] += fragmento.function.arguments
+        except APIError as e:
+            print(f"      error de OpenAI: {e}")
+            yield {"tipo": "error", "mensaje": "No pude conectarme para responder. Probá de nuevo en un momento."}
+            return
+
+        if not llamadas:
+            texto_limpio = limpiar_respuesta(texto)
+            mensajes.append({"role": "assistant", "content": texto_limpio})
+            yield {"tipo": "fin", "texto_limpio": texto_limpio}
+            return
+
+        ordenadas = [llamadas[i] for i in sorted(llamadas)]
         mensajes.append({
             "role": "assistant",
-            "content": ("Me quedé dando vueltas con esa búsqueda y no llegué a nada firme. "
-                        "¿Me lo pedís de nuevo con la dirección exacta?"),
-        })
-        return mensajes
-
-    tool_choice = "required" if requiere_tool_choice_forzado(mensajes) else "auto"
-
-    respuesta = client.chat.completions.create(
-        model=MODELO,
-        messages=mensajes,
-        tools=TOOLS,
-        tool_choice=tool_choice,
-    )
-
-    mensaje = respuesta.choices[0].message
-
-    if not mensaje.tool_calls:
-        mensajes.append({"role": "assistant", "content": limpiar_respuesta(mensaje.content)})
-        return mensajes
-
-    mensajes.append(mensaje)
-
-    for tool_call in mensaje.tool_calls:
-        resultado = ejecutar_herramienta(tool_call.function.name, tool_call.function.arguments)
-
-        if isinstance(resultado, dict) and resultado.get("error"):
-            print(f"      aviso: {resultado['error']}")
-
-        mensajes.append({
-            "role": "tool",
-            "tool_call_id": tool_call.id,
-            "content": json.dumps(resultado, ensure_ascii=False, default=str),
+            "content": texto or None,
+            "tool_calls": [
+                {"id": l["id"], "type": "function",
+                 "function": {"name": l["name"], "arguments": l["arguments"]}}
+                for l in ordenadas
+            ],
         })
 
-    return preguntar_al_agente(mensajes, profundidad + 1)
+        for l in ordenadas:
+            yield {"tipo": "herramienta", "nombre": l["name"]}
+            resultado = ejecutar_herramienta(l["name"], l["arguments"])
+            if isinstance(resultado, dict) and resultado.get("error"):
+                print(f"      aviso: {resultado['error']}")
+            mensajes.append({
+                "role": "tool",
+                "tool_call_id": l["id"],
+                "content": json.dumps(resultado, ensure_ascii=False, default=str),
+            })
+
+    # Sin tope, cuando el modelo se empaca reintentando un argumento bloqueado da vueltas indefinidamente.
+    texto_limpio = ("Me quedé dando vueltas con esa búsqueda y no llegué a nada firme. "
+                    "¿Me lo pedís de nuevo con la dirección exacta?")
+    mensajes.append({"role": "assistant", "content": texto_limpio})
+    yield {"tipo": "fin", "texto_limpio": texto_limpio}
 
 
 def main():
@@ -496,11 +534,20 @@ def main():
         set_mensaje_usuario(entrada)
         historial = podar_historial(historial)
         historial.append({"role": "user", "content": entrada})
-        historial = preguntar_al_agente(historial)
-
-        ultima = historial[-1]
-        contenido = ultima["content"] if isinstance(ultima, dict) else ultima.content
-        print(f"\n{NOMBRE_AGENTE}: {contenido}\n")
+        # El prefijo se imprime con el primer texto: antes pueden salir las lineas [herramienta].
+        empezo = False
+        for evento in responder_en_stream(historial):
+            if evento["tipo"] == "texto":
+                if not empezo:
+                    print(f"\n{NOMBRE_AGENTE}: ", end="")
+                    empezo = True
+                print(evento["contenido"], end="", flush=True)
+            elif evento["tipo"] == "error":
+                print(f"\n{NOMBRE_AGENTE}: {evento['mensaje']}", end="")
+            elif evento["tipo"] == "fin" and not empezo:
+                # Respuesta que no vino en streaming: el mensaje de MAX_PROFUNDIDAD.
+                print(f"\n{NOMBRE_AGENTE}: {evento['texto_limpio']}", end="")
+        print("\n")
 
 
 if __name__ == "__main__":
