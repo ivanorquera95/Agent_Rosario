@@ -98,14 +98,37 @@ def detectar_dia_pedido(texto):
             return dia
     return None
 
+# "¿qué clima hace hoy?" no pide el pronóstico de la semana: si no lo pidió,
+# la herramienta devuelve solo el clima de ahora y el modelo no puede estirarse.
+PALABRAS_PRONOSTICO = ("pronostico", "proximos dias", "esta semana", "la semana",
+                       "finde", "fin de semana", "que viene", "dias")
+
+
+def pide_pronostico(texto):
+    t = sin_acentos(texto)
+    return any(p in t for p in PALABRAS_PRONOSTICO)
 
 def obtener_clima_verificado(lugar=None, dias=None, desde=None):
     # Ante "¿y mañana?" el modelo llama con dias=1 y sin 'desde', y la herramienta
     # devuelve el dia de hoy. Si el usuario nombro un dia y el modelo no lo paso,
     # se completa aca.
+    mensaje = contexto().ultimo_mensaje
     if not desde:
-        desde = detectar_dia_pedido(contexto().ultimo_mensaje)
-    return obtener_clima(lugar=lugar, dias=dias, desde=desde)
+        desde = detectar_dia_pedido(mensaje)
+
+    quiere_pronostico = bool(desde) or pide_pronostico(mensaje)
+    if not quiere_pronostico:
+        dias = 1
+
+    resultado = obtener_clima(lugar=lugar, dias=dias, desde=desde)
+
+    if not quiere_pronostico and isinstance(resultado, dict) and not resultado.get("error"):
+        resultado.pop("pronostico", None)
+        resultado["como_responder"] = (
+            "El usuario preguntó por el clima de AHORA. Contestá en una o dos "
+            "oraciones y NO agregues el pronóstico de los próximos días."
+        )
+    return resultado
 
 # Lugares y colectivos NO apuntan a las funciones crudas: van a los wrappers de resolver_ubicacion.py, que resuelven nombres a direcciones y frenan las direcciones inventadas.
 FUNCIONES_DISPONIBLES = {
@@ -405,8 +428,10 @@ PATRON_DIRECCION = re.compile(r"\b[A-Za-zÁ-úñÑ]{3,}\s+\d{1,5}\b")
 
 # Frases de cierre que el modelo mete por reflejo aunque el prompt se lo prohiba.
 CIERRES_DE_RELLENO = re.compile(
-    r"\n\s*(si (necesit|tenés|tienes|querés|quieres|hay algo)|cualquier (otra )?(cosa|duda)|"
-    r"no dudes en|estoy (acá|aquí) para)[^\n]*$",
+    r"\n\s*[¿¡]?\s*(si (necesit|tenés|tienes|querés|quieres|hay algo)|"
+    r"cualquier (otra )?(cosa|duda)|no dudes en|estoy (acá|aquí) para|"
+    r"necesit(ás|as) algo|quer(és|es) (que|saber|más)|te (sirve|ayudo)|"
+    r"avisame|decime si|espero que)[^\n]*$",
     re.IGNORECASE,
 )
 

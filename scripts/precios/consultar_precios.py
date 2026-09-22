@@ -210,12 +210,16 @@ def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, l
             "unidad": ganador.unidad_comparable,
             "precio_envase": ganador.precio_efectivo,
             "sucursal": ganador.sucursal,
+            "direccion": ganador.sucursal_direccion,
+            "localidad": ganador.localidad,
         } if ganador else None,
         "como_responder": (
-            "El más barato es el de 'mas_barato_por_unidad', que es el de menor "
-            "precio por kilo o litro. NO elijas el del número más chico en "
-            "'precio': ese es el precio del envase, y un envase más chico "
-            "siempre cuesta menos sin ser más barato."
+            "Si preguntó por el más barato, mostrá SOLO 'mas_barato_por_unidad', "
+            "en dos líneas: el producto con el precio del envase y, entre "
+            "paréntesis, a cuánto sale el kilo o el litro; abajo el supermercado "
+            "con la dirección. Nada de marca, código ni sucursal. "
+            "El más barato es el de menor precio por kilo o litro: NO elijas el "
+            "número más chico de 'precio', que es el del envase."
         ),
         "por_supermercado": [
               {"supermercado": nombre, "productos": productos}

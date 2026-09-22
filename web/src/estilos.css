@@ -180,6 +180,12 @@
   border-left: 2px solid #1d3346;
 }
 
+.mensaje a {
+  color: #4fd1ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* -------------------------------------------------------------------- Pie */
 
 .pie {

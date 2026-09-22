@@ -5,6 +5,25 @@ const TEXTO_ESTADO = {
   pensando: 'Rosario está pensando…',
   hablando: 'Rosario está respondiendo…',
 }
+// Los enlaces llegan como [texto](url). Se convierten a mano en vez de sumar
+// una libreria de Markdown: el prompt ya prohibe negritas y titulos.
+const ENLACE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g
+
+function conEnlaces(texto) {
+  const partes = []
+  let ultimo = 0
+  for (const m of texto.matchAll(ENLACE)) {
+    if (m.index > ultimo) partes.push(texto.slice(ultimo, m.index))
+    partes.push(
+      <a key={m.index} href={m[2]} target="_blank" rel="noreferrer">
+        {m[1]}
+      </a>,
+    )
+    ultimo = m.index + m[0].length
+  }
+  partes.push(texto.slice(ultimo))
+  return partes
+}
 
 export default function Chat({ mensajes, estado, error, enviar, nuevaConversacion }) {
   const [texto, setTexto] = useState('')
@@ -48,7 +67,7 @@ export default function Chat({ mensajes, estado, error, enviar, nuevaConversacio
         )}
         {mensajes.map((m, i) => (
           <div key={i} className={`mensaje ${m.rol}`}>
-            {m.contenido || '…'}
+            {m.contenido ? conEnlaces(m.contenido) : '…'}
           </div>
         ))}
       </section>

@@ -127,20 +127,19 @@ DIAS_SEMANA = {
     "viernes": 4, "sabado": 5, "domingo": 6,
 }
 
+NOMBRES_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
+def texto_cuando(fechas):
+    # Una linea de texto en vez de una lista de fechas ISO: el modelo copia lo
+    # que le damos, asi que le damos ya escrito lo que tiene que mostrar.
+    if len(fechas) == 1:
+        f = fechas[0]
+        return f"{NOMBRES_DIAS[f.weekday()]} {f.day}"
+    return f"del {fechas[0].day}/{fechas[0].month} al {fechas[-1].day}/{fechas[-1].month}"
 
 def interpretar_dias(texto):
-    """
-    Convierte el campo 'dias' en un set de dias de la semana (lunes=0).
-
-    'Miércoles'                      -> {2}
-    'Martes y Jueves'                -> {1, 3}
-    'Lunes a Viernes'                -> {0, 1, 2, 3, 4}
-    'Todos los días'                 -> {0..6}
-    None o algo que no se entiende   -> None  (sin dato: no se filtra)
-
-    Devolver None ante lo desconocido es deliberado: mostrar un evento de mas es
-    mucho mas barato que borrar uno real por un formato que no previmos.
-    """
+   
     t = normalizar(texto)
     if not t:
         return None
@@ -326,34 +325,23 @@ def consultar_agenda(fecha="hoy", categoria=None, busqueda=None,
             descartados_por_dia += 1
             continue
 
-        candidatos.append({
+        evento = {
             "titulo": fila.titulo,
+            "url": fila.url,
+            "cuando": texto_cuando(fechas),
+            "hora": fila.hora_texto,
+            "entrada": "Gratis" if fila.es_gratis else fila.entrada,
+            "lugar": fila.lugar_nombre or fila.lugar_direccion,
             # True: el campo 'dias' confirma que cae en el rango pedido.
             # False: el evento no trae dias, solo solapa por rango de fechas.
             "dia_confirmado": confirmado,
-            "fechas_en_rango": [f.isoformat() for f in fechas],
-            "fecha_inicio": fila.fecha_inicio.isoformat(),
-            "fecha_fin": fila.fecha_fin.isoformat(),
-            "duracion_dias": fila.duracion_dias,
-            # Texto libre de la fuente: puede decir "martes y jueves". Se muestra
-            # tal cual, no se interpreta.
-            "dias": fila.dias,
-            "hora": fila.hora_texto,
-            "lugar": fila.lugar_nombre,
-            "direccion": fila.lugar_direccion,
-            "coordenadas": ({"lat": fila.lugar_latitud, "lon": fila.lugar_longitud}
-                            if fila.tiene_coordenadas else None),
-            # "municipio" es dato oficial; "deducido" salio de la descripcion con
-            # un modelo y el agente tiene que decirlo asi.
-            "origen_lugar": fila.origen_lugar,
-            "entrada": fila.entrada,
-            "es_gratis": fila.es_gratis,
-            "categorias": list(fila.categorias or []),
-            "serie": fila.etiqueta_serie,
-            "url": fila.url,
             "_orden_primera_fecha": fechas[0],
             "_orden_fin": fila.fecha_fin,
-        })
+        }
+        # Solo cuando hay algo que aclarar: "municipio" es dato oficial y no se menciona.
+        if fila.origen_lugar != "municipio":
+            evento["origen_lugar"] = fila.origen_lugar
+        candidatos.append(evento)
 
     # Primero lo confirmado, despues lo que empieza antes, despues lo que esta
     # por terminar.
@@ -377,6 +365,12 @@ def consultar_agenda(fecha="hoy", categoria=None, busqueda=None,
         "sin_dia_confirmado": sum(1 for e in candidatos if not e["dia_confirmado"]),
         "descartados_por_dia_de_semana": descartados_por_dia,
         "eventos": eventos,
+        "como_responder": (
+            "UNA línea por evento, con este formato exacto: "
+            "[titulo](url) — cuando, hora — entrada. "
+            "Nada más: ni lugar, ni dirección, ni viñetas debajo. "
+            "El usuario abre el link si quiere el detalle."
+        ),
     }
 
     if filas:
@@ -424,14 +418,8 @@ def main():
 
     for e in r["eventos"]:
         marca = "" if e["dia_confirmado"] else "  [día sin confirmar]"
-        print(f"\n- {e['titulo']}{marca}")
-        print(f"    cae: {', '.join(e['fechas_en_rango'][:4])} | días: {e['dias']} | hora: {e['hora']}")
-        ubicacion = e["lugar"] or e["direccion"] or "sin lugar"
-        if e["lugar"] and e["direccion"]:
-            ubicacion = f"{e['lugar']} ({e['direccion']})"
-        print(f"    {ubicacion}  [{e['origen_lugar']}]"
-              + ("  con coordenadas" if e["coordenadas"] else ""))
-        print(f"    entrada: {e['entrada'] or '-'} | {', '.join(e['categorias'])}")
+        print(f"- {e['titulo']}{marca}")
+        print(f"    {e['cuando']} | {e['hora'] or '-'} | {e['entrada'] or '-'} | {e['lugar'] or 'sin lugar'}")
 
 
 if __name__ == "__main__":
