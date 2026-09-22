@@ -412,7 +412,29 @@ def requiere_tool_choice_forzado(mensajes):
         return True
     return bool(PATRON_NUMERO_LINEA.search(contenido) or PATRON_DIRECCION.search(contenido))
 
+def ejecutar_herramienta(nombre_funcion, argumentos_json):
+    # Nunca lanza: cada tool_call necesita su respuesta 'tool' o la API rechaza
+    # la llamada siguiente. Cualquier falla vuelve como {"error": ...}.
+    try:
+        argumentos = json.loads(argumentos_json or "{}")
+    except json.JSONDecodeError:
+        return {
+            "error": "Los argumentos no son un JSON válido.",
+            "instruccion_para_el_agente": "Volvé a llamar a la herramienta con argumentos en JSON válido.",
+        }
 
+    print(f"  [{nombre_funcion}] {argumentos}")
+
+    funcion = FUNCIONES_DISPONIBLES.get(nombre_funcion)
+    if funcion is None:
+        return {"error": f"Herramienta '{nombre_funcion}' no existe."}
+
+    try:
+        return funcion(**argumentos)
+    except Exception as e:
+        return {"error": str(e)}
+    
+    
 def preguntar_al_agente(mensajes, profundidad=0):
     if profundidad >= MAX_PROFUNDIDAD:
         mensajes.append({
@@ -440,19 +462,7 @@ def preguntar_al_agente(mensajes, profundidad=0):
     mensajes.append(mensaje)
 
     for tool_call in mensaje.tool_calls:
-        nombre_funcion = tool_call.function.name
-        argumentos = json.loads(tool_call.function.arguments)
-
-        print(f"  [{nombre_funcion}] {argumentos}")
-
-        funcion = FUNCIONES_DISPONIBLES.get(nombre_funcion)
-        if funcion is None:
-            resultado = {"error": f"Herramienta '{nombre_funcion}' no existe."}
-        else:
-            try:
-                resultado = funcion(**argumentos)
-            except Exception as e:
-                resultado = {"error": str(e)}
+        resultado = ejecutar_herramienta(tool_call.function.name, tool_call.function.arguments)
 
         if isinstance(resultado, dict) and resultado.get("error"):
             print(f"      aviso: {resultado['error']}")
