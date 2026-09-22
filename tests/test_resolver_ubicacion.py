@@ -13,6 +13,8 @@ from colectivos.resolver_ubicacion import (
     registrar_conocida,
     set_mensaje_usuario,
     viene_del_usuario,
+    planificar_viaje_resuelto,
+    proximos_colectivos_resuelto,
 )
 
 
@@ -172,3 +174,11 @@ def test_pasa_la_direccion_de_google_recortada():
 def test_falla_abierta_sin_mensaje_registrado():
     # A proposito: un olvido de set_mensaje_usuario no tiene que romper el agente.
     assert viene_del_usuario("La Paz 1400")
+
+def test_sin_origen_pide_preguntar():
+    # Devuelve antes de tocar la red.
+    assert "origen" in planificar_viaje_resuelto(destino="Monumento")["error"]
+
+
+def test_sin_lugar_pide_preguntar():
+    assert "lugar" in proximos_colectivos_resuelto()["error"]

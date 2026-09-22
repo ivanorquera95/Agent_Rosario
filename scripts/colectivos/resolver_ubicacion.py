@@ -380,8 +380,24 @@ def buscar_lugares_registrado(*args, **kwargs):
 
     return resultado
 
-
-def planificar_viaje_resuelto(origen, destino, max_opciones=10, **kwargs):
+def falta_dato(etiqueta, pregunta):
+      return {
+          "error": f"Falta el {etiqueta}: el usuario no dijo {pregunta}.",
+          "instruccion_para_el_agente": (
+              f"Preguntale al usuario {pregunta}. NO lo inventes ni vuelvas a llamar "
+              "a la herramienta hasta que te lo diga."
+          ),
+      }
+      
+def planificar_viaje_resuelto(origen=None, destino=None, max_opciones=10, **kwargs):
+    # Con tool_choice="required" el modelo tiene que llamar a algo aunque el
+    # usuario no haya dicho de donde sale, y entonces inventaba el origen.
+    # Ahora puede llamar sin origen y la herramienta le dice que pregunte.
+    if not origen:
+          return falta_dato("origen", "de dónde sale")
+    if not destino:
+          return falta_dato("destino", "adónde va")
+      
     if not viene_del_usuario(origen):
         return error_inventado("origen", origen)
     if not viene_del_usuario(destino):
@@ -415,7 +431,9 @@ def planificar_viaje_resuelto(origen, destino, max_opciones=10, **kwargs):
     return resultado
 
 
-def proximos_colectivos_resuelto(lugar, **kwargs):
+def proximos_colectivos_resuelto(lugar=None, **kwargs):
+    if not lugar:
+          return falta_dato("lugar", "dónde está")
     if not viene_del_usuario(lugar):
         return error_inventado("lugar", lugar)
 
