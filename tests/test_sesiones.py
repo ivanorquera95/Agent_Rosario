@@ -8,7 +8,7 @@ import psycopg
 import pytest
 from dotenv import load_dotenv
 
-from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id
+from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
 
 load_dotenv()
 URL_TEST = os.getenv("DATABASE_URL_TEST")
@@ -132,3 +132,13 @@ def test_sesion_trabada_se_destraba(base):
     tomar_sesion(sid)
     ejecutar("update sesiones set ocupada_desde = now() - interval '11 minutes' where id = %s", sid)
     tomar_sesion(sid)  # no tiene que tirar SesionOcupada
+
+@necesita_base
+def test_historial_para_la_pantalla(base):
+    sid = nuevo_id()
+    liberar_sesion(tomar_sesion(sid), "hola", "¡Hola!")
+    assert leer_historial(sid) == [
+        {"rol": "user", "contenido": "hola"},
+        {"rol": "assistant", "contenido": "¡Hola!"},
+    ]
+    assert leer_historial(nuevo_id()) == []

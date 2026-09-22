@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
-from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id
+from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
 
@@ -32,6 +32,19 @@ def salud():
     # Para chequear que el servidor esta vivo (lo va a usar el deploy).
     return {"ok": True}
 
+
+
+class PedidoHistorial(BaseModel):
+    sesion_id: str
+
+
+@app.post("/historial")
+def historial(pedido: PedidoHistorial):
+    # POST y no GET: el id va en el cuerpo, nunca en la URL.
+    sesion_id = validar_id(pedido.sesion_id)
+    if sesion_id is None:
+        raise HTTPException(400, "sesion_id tiene que ser un UUID v4.")
+    return {"mensajes": leer_historial(sesion_id)}
 
 @app.post("/chat")
 def chat(pedido: Pedido):

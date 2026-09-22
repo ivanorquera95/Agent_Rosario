@@ -115,3 +115,20 @@ def liberar_sesion(sesion, pregunta=None, respuesta=None):
             "update sesiones set ocupada_desde = null, ultima_actividad = now() where id = %s",
             (sesion.id,),
         )
+
+def leer_historial(sesion_id):
+    # Solo lectura: no toma la sesion ni la crea. Sirve para volver a mostrar
+    # la charla en pantalla cuando el usuario recarga la pagina.
+    with conectar() as con:
+        filas = con.execute(
+            """
+            select m.rol, m.contenido
+              from mensajes m
+              join sesiones s on s.id = m.sesion_id
+             where m.sesion_id = %s
+               and s.ultima_actividad >= now() - %s::interval
+             order by m.id
+            """,
+            (sesion_id, VENCIMIENTO),
+        ).fetchall()
+    return [{"rol": r, "contenido": c} for r, c in filas]
