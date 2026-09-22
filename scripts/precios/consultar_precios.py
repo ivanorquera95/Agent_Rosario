@@ -62,13 +62,39 @@ def ejecutar(sql, parametros):
             "NO inventes precios ni comercios.",
         )
 
+# Los datos son de la ultima corrida del DAG (el dia anterior): una promo que
+# vencio ayer ya no vale hoy. Si vencio o todavia no empezo, el precio vuelve al
+# de lista. Sin fecha en la leyenda ("hasta agotar stock") se asume vigente.
+# Va en la consulta y no en dbt porque "hoy" cambia todos los dias.
+PRECIOS_HOY = f"""
+precios_hoy as (
+    select * replace(
+        promo_vigente as tiene_promo,
+        if(promo_vigente, leyenda_promo1, null) as leyenda_promo1,
+        if(tiene_promo and not promo_vigente, precio_lista, precio_efectivo) as precio_efectivo,
+        -- El precio por unidad es proporcional al del envase: se escala igual.
+        if(tiene_promo and not promo_vigente,
+           precio_por_unidad * safe_divide(precio_lista, precio_efectivo),
+           precio_por_unidad) as precio_por_unidad
+    )
+    from (
+        select *,
+            coalesce(tiene_promo, false)
+            and coalesce(promo_desde <= current_date('America/Argentina/Buenos_Aires'), true)
+            and coalesce(promo_hasta >= current_date('America/Argentina/Buenos_Aires'), true)
+            as promo_vigente
+        from {TABLA}
+    )
+)
+"""
 
 # --------------------------------------------------------- buscar precios
 
 SQL_BUSCAR = f"""
-with filtrados as (
-    select *
-    from {TABLA}
+  with {PRECIOS_HOY},
+  filtrados as (
+      select *
+      from precios_hoy
     where {filtro_de_palabras('palabras')}
       and (@comercio is null or upper(comercio) like concat('%', @comercio, '%'))
       and (@localidad is null or localidad = @localidad)
