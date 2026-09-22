@@ -22,6 +22,7 @@ from colectivos.resolver_ubicacion import (
     buscar_lugares_registrado,
     set_mensaje_usuario,
 )
+from comun.contexto import ContextoSesion, contexto, usar_contexto
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -44,16 +45,10 @@ def sin_acentos(texto):
 # "yerba" y "fideos" —que el usuario nunca nombro— y contesta como si
 # esa fuera la pregunta. Si ninguna palabra del producto aparece en lo
 # que escribio, la herramienta no corre y se le dice cual usar.
-mensaje_actual = ""
-
-
-def set_mensaje_precios(texto):
-    global mensaje_actual
-    mensaje_actual = texto
 
 
 def buscar_precios_verificado(producto=None, **resto):
-    escrito = sin_acentos(mensaje_actual)
+    escrito = sin_acentos(contexto().ultimo_mensaje)
     palabras = [p for p in sin_acentos(producto).split() if len(p) > 2]
 
     if palabras and not any(p in escrito for p in palabras):
@@ -75,7 +70,7 @@ def consultar_descuentos_verificado(cadena=None, **resto):
     # veces, con Coto, Jumbo y DIA. Sin el filtro de cadena la herramienta
     # ya devuelve todas juntas, asi que una cadena que el usuario no
     # escribió se descarta.
-    if cadena and sin_acentos(cadena) not in sin_acentos(mensaje_actual):
+    if cadena and sin_acentos(cadena) not in sin_acentos(contexto().ultimo_mensaje):
         cadena = None
     return consultar_descuentos(cadena=cadena, **resto)
 
@@ -476,6 +471,8 @@ def main():
     print("Escribí 'salir' para terminar.\n")
 
     historial = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # La terminal es una sola conversacion: un solo contexto para toda la sesion.
+    usar_contexto(ContextoSesion())
 
     while True:
         entrada = input("Vos: ").strip()
@@ -485,9 +482,8 @@ def main():
         if not entrada:
             continue
 
-        # La guardia anti-direccion-inventada necesita saber que escribio el usuario para poder comparar contra los argumentos del modelo.
+        # Las dos guardias (precios y direcciones) comparan contra lo que escribio el usuario.
         set_mensaje_usuario(entrada)
-        set_mensaje_precios(entrada)
         historial = podar_historial(historial)
         historial.append({"role": "user", "content": entrada})
         historial = preguntar_al_agente(historial)

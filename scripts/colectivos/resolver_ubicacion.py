@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from comun.localidades import nombra_otra_ciudad
 from lugares.lugares import buscar_lugares
 from colectivos.colectivos_gran_rosario import planificar_viaje_completo, proximos_colectivos
+from comun.contexto import contexto
 
 RADIO_MISMO_LUGAR_M = 400
 RATIO_AMBIGUEDAD = 0.45
@@ -63,46 +64,32 @@ def distancia_metros(lat1, lon1, lat2, lon2):
     dlon = (lon1 - lon2) * 111_320 * math.cos(math.radians((lat1 + lat2) / 2))
     return math.hypot(dlat, dlon)
 
-
-ULTIMO_MENSAJE_USUARIO = ""
-MENSAJES_USUARIO = []
-DIRECCIONES_CONOCIDAS = set()
-
-
 def set_mensaje_usuario(texto):
     #El agente llama a esto cada vez que el usuario escribe algo.
-    global ULTIMO_MENSAJE_USUARIO
-    ULTIMO_MENSAJE_USUARIO = texto or ""
+    ctx = contexto()
+    ctx.ultimo_mensaje = texto or ""
     if texto:
-        MENSAJES_USUARIO.append(texto)
-        del MENSAJES_USUARIO[:-MAX_MENSAJES_RECORDADOS]
-
-
-def reset_contexto():
-    global ULTIMO_MENSAJE_USUARIO
-    ULTIMO_MENSAJE_USUARIO = ""
-    MENSAJES_USUARIO.clear()
-    DIRECCIONES_CONOCIDAS.clear()
+        ctx.mensajes_usuario.append(texto)
+        del ctx.mensajes_usuario[:-MAX_MENSAJES_RECORDADOS]
 
 
 def registrar_conocida(texto):
     if texto:
-        DIRECCIONES_CONOCIDAS.add(normalizar(texto))
-
+        contexto().direcciones_conocidas.add(normalizar(texto))
 
 def viene_del_usuario(argumento):
     #True si el argumento se puede rastrear a algo que el usuario escribio, o a algo que devolvio una herramienta en esta charla.
     #Falla: si todavia no hay mensaje registrado, no bloquea nada. Es a proposito, para que un olvido de set_mensaje_usuario() no rompa el agente.
-    
-    if not ULTIMO_MENSAJE_USUARIO or not argumento:
+    ctx = contexto()
+    if not ctx.ultimo_mensaje or not argumento:
         return True
-    if normalizar(argumento) in DIRECCIONES_CONOCIDAS:
+    if normalizar(argumento) in ctx.direcciones_conocidas:
         return True
     # El modelo suele copiar la direccion de Google a media asta ("Nansen 323, S2013APG Rosario"): se compara tambien la version limpia.
-    if normalizar(limpiar_direccion(argumento)) in DIRECCIONES_CONOCIDAS:
+    if normalizar(limpiar_direccion(argumento)) in ctx.direcciones_conocidas:
         return True
 
-    mensaje = normalizar(" ".join(MENSAJES_USUARIO))
+    mensaje = normalizar(" ".join(ctx.mensajes_usuario))
     tokens = [t for t in normalizar(argumento).split() if len(t) > 2 or t.isdigit()]
     if not tokens:
         return True

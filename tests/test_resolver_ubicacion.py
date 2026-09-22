@@ -11,7 +11,6 @@ from colectivos.resolver_ubicacion import (
     parece_direccion,
     rankear_lugares,
     registrar_conocida,
-    reset_contexto,
     set_mensaje_usuario,
     viene_del_usuario,
 )
@@ -148,13 +147,6 @@ def test_nombra_otra_ciudad(texto, esperado):
 
 
 # --------------------------------------- guardia anti-direccion-inventada
-
-@pytest.fixture(autouse=True)
-def contexto_limpio():
-    # El estado vive en el modulo: sin esto, un test contamina al siguiente.
-    reset_contexto()
-    yield
-    reset_contexto()
 
 
 def test_pasa_lo_que_escribio_el_usuario():
