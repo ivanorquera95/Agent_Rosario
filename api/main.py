@@ -3,15 +3,23 @@ import json
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
-from api.sesiones import SesionOcupada, liberar_sesion, tomar_sesion, validar_id
+from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
 
 MAX_LARGO_MENSAJE = 1000
 
-app = FastAPI(title="Rosario Vivo")
+@asynccontextmanager
+async def ciclo_de_vida(app):
+    # Crea las tablas al arrancar si no existen.
+    crear_esquema()
+    yield
+
+
+app = FastAPI(title="Rosario Vivo", lifespan=ciclo_de_vida)
 
 
 class Pedido(BaseModel):
@@ -74,8 +82,7 @@ def eventos_sse(sesion, mensaje):
     finally:
         # Corre aunque el usuario cierre la pestaña a mitad de la respuesta.
         turno.close()
-        guardar = None
         if termino_bien:
-            # Solo lo que sobrevive a la poda: la pregunta y la respuesta final.
-            guardar = base[1:] + [pregunta, historial[-1]]
-        liberar_sesion(sesion, guardar)
+            liberar_sesion(sesion, mensaje, historial[-1]["content"])
+        else:
+            liberar_sesion(sesion)

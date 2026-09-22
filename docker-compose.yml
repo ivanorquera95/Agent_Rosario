@@ -1,0 +1,24 @@
+# Base de datos de la app (sesiones del chat). Separada del Postgres de
+# Airflow: cada servicio es dueño de sus datos y se reinician por separado.
+services:
+  postgres-app:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${APP_DB_USUARIO}
+      POSTGRES_PASSWORD: ${APP_DB_CLAVE}
+      POSTGRES_DB: rosario
+    ports:
+      # Solo accesible desde esta maquina, en 5433 por si hay otro Postgres en 5432.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-app:/var/lib/postgresql/data
+      # Crea la base de tests la primera vez que arranca el contenedor.
+      - ./api/crear_base_test.sql:/docker-entrypoint-initdb.d/crear_base_test.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${APP_DB_USUARIO}", "-d", "rosario"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-app:
