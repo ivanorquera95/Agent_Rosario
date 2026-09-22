@@ -1,0 +1,81 @@
+/* ---------------------------------------------------------------- Anillos */
+
+.anillos {
+  --color: #4fd1ff; /* celeste: reposo */
+  display: block;
+  width: min(70vw, 260px);
+  margin: 0 auto 1rem;
+  filter: drop-shadow(0 0 4px var(--color));
+  transition: filter 0.6s;
+}
+
+.anillos.pensando,
+.anillos.hablando {
+  --color: #ffb347; /* ambar: trabajando */
+  filter: drop-shadow(0 0 10px var(--color));
+}
+
+.anillos circle {
+  fill: none;
+  stroke: var(--color);
+  transition: stroke 0.6s;
+}
+
+.anillos .nucleo {
+  fill: var(--color);
+  fill-opacity: 0.08;
+}
+
+.anillos text {
+  fill: var(--color);
+  font-size: 13px;
+  letter-spacing: 3px;
+  transition: fill 0.6s;
+}
+
+/* Que cada grupo gire sobre su propio centro y no sobre la esquina del SVG. */
+.anillo,
+.extra,
+.conjunto {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Giro base: siempre activo, lento, cada anillo a su ritmo y en su sentido. */
+.anillo-1 { animation: girar 60s linear infinite; }
+.anillo-2 { animation: girar 40s linear infinite reverse; }
+.anillo-4 { animation: girar 30s linear infinite; }
+.anillo-5 { animation: girar 20s linear infinite reverse; }
+
+/* Giro extra, que se suma al base al pensar o hablar. En reposo se PAUSA en
+   vez de sacarse: asi el anillo queda donde estaba y no salta de posicion al
+   cambiar de estado. */
+.anillo-1 .extra { animation: girar 8s linear infinite; }
+.anillo-2 .extra { animation: girar 6s linear infinite reverse; }
+.anillo-4 .extra { animation: girar 5s linear infinite; }
+.anillo-5 .extra { animation: girar 3s linear infinite reverse; }
+
+.anillos .extra { animation-play-state: paused; }
+.anillos.pensando .extra,
+.anillos.hablando .extra { animation-play-state: running; }
+
+/* Hablando: todo el conjunto late. */
+.anillos.hablando .conjunto {
+  animation: latir 0.9s ease-in-out infinite;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes latir {
+  50% { transform: scale(1.04); }
+}
+
+/* Si la persona pidio "reducir movimiento" en su sistema, los anillos quedan quietos. */
+@media (prefers-reduced-motion: reduce) {
+  .anillos,
+  .anillos * {
+    animation: none !important;
+  }
+}

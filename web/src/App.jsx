@@ -1,11 +1,13 @@
+import Anillos from './Anillos'
 import Chat from './Chat'
 import { useRosario } from './useRosario'
+import './estilos.css'
 
 export default function App() {
   const rosario = useRosario()
   return (
     <main>
-      <h1>Rosario</h1>
+      <Anillos estado={rosario.estado} />
       <Chat {...rosario} />
     </main>
   )
