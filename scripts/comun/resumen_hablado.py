@@ -77,9 +77,26 @@ def _precios(resultado):
         frase += " " + CIERRE_CON_MAS
     return frase
 
+def _comparar(resultado):
+    comercios = resultado.get("por_comercio")
+    if not comercios:
+        return None
+
+    c = comercios[0]
+    frase = f"Lo más barato es {_pesos(c['precio'])} en {c['comercio']}"
+    if c.get("tiene_promo"):
+        frase += ", con promoción"
+    frase += "."
+    if len(comercios) > 1:
+        diferencia = resultado.get("diferencia_maxima")
+        if diferencia:
+            frase += f" Entre la más cara y la más barata hay {_pesos(diferencia)} de diferencia."
+        frase += " " + CIERRE_CON_MAS
+    return frase
 
 def _pesos(valor):
-    # "1507,5" se lee mal: la voz dice los centavos como si fueran pesos.
+    # Con el simbolo $, el TTS lee "dolares": la palabra va escrita. Y los
+    # centavos se leen como si fueran pesos, asi que se redondea.
     return f"{round(valor):,} pesos".replace(",", ".")
 
 
@@ -123,6 +140,7 @@ ARMADORES = {
     "buscar_precios": _precios,
     "consultar_agenda": _agenda,
     "consultar_descuentos": _descuentos,
+    "comparar_producto": _comparar,
 }
 
 

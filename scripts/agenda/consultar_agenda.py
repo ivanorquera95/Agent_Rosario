@@ -1,31 +1,21 @@
-"""
-Consulta la agenda cultural en BigQuery.
-
-Va en scripts/agenda/consulta_agenda.py
-
-Todo lo que se puede decidir sin la base (interpretar "el finde", parsear
-"Miercoles a Sabado", armar el patron de busqueda) se resuelve en Python y se
-testea offline. A BigQuery solo se va a buscar filas.
-"""
+#Consulta la agenda cultural en BigQuery.
 
 import sys
 import os
-sys.stdout.reconfigure(encoding="utf-8")
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import re
 import unicodedata
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-
 from google.cloud import bigquery
+sys.stdout.reconfigure(encoding="utf-8")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 PROJECT_ID = "agent-rosario"
 DATASET = "rosario_vivo"
 TABLA = f"`{PROJECT_ID}.{DATASET}.eventos_agenda`"
 ZONA_ROSARIO = ZoneInfo("America/Argentina/Buenos_Aires")
-
-LIMITE_POR_DEFECTO = 12
+LIMITE_POR_DEFECTO = 8
 DIAS_ALERTA_DATOS_VIEJOS = 2
 
 _cliente = None
@@ -61,10 +51,8 @@ def error(mensaje, instruccion, **extra):
 # ---------------------------------------------------------------- fechas
 
 def interpretar_fecha(texto, hoy=None):
-    """
-    Devuelve (desde, hasta, descripcion) o None si no se entiende.
-    Funcion pura: no toca BigQuery.
-    """
+    #Devuelve (desde, hasta, descripcion) o None si no se entiende.
+
     hoy = hoy or hoy_en_rosario()
     t = normalizar(texto) or "hoy"
 
@@ -162,15 +150,8 @@ def interpretar_dias(texto):
 
 
 def fechas_en_rango(fecha_inicio, fecha_fin, dias_texto, desde, hasta):
-    """
-    Devuelve (dia_confirmado, [fechas concretas en las que cae el evento]).
+    #Devuelve (dia_confirmado, [fechas concretas en las que cae el evento]).
 
-    Sin este filtro, "que hay hoy" devuelve casi toda la agenda: las muestras y
-    los talleres duran meses y solapan con cualquier dia.
-
-    dia_confirmado=False significa que el evento no trae el campo 'dias': solapa
-    por rango pero no sabemos si efectivamente hay funcion ese dia.
-    """
     inicio = max(fecha_inicio, desde)
     fin = min(fecha_fin, hasta)
     if inicio > fin:
@@ -188,12 +169,8 @@ def fechas_en_rango(fecha_inicio, fecha_fin, dias_texto, desde, hasta):
 # ------------------------------------------------------------ categorias
 
 def obtener_categorias(forzar_recarga=False):
-    """
-    Lista real de categorias, leida una vez por proceso.
+    #Lista real de categorias, leida una vez por proceso.
 
-    No se hardcodea: mezclan tipo (Musica, Teatro) con distrito (Centro, Sur) y
-    aparecen nuevas cuando entran eventos.
-    """
     global _categorias_cache
     if _categorias_cache is None or forzar_recarga:
         sql = f"SELECT DISTINCT c AS categoria FROM {TABLA}, UNNEST(categorias) AS c ORDER BY categoria"
@@ -226,12 +203,8 @@ VOCALES_CON_TILDE = {
 
 
 def patron_de_busqueda(texto):
-    """
-    Arma un patron que ignora acentos: "musica" encuentra "Música".
+    #Arma un patron que ignora acentos: "musica" encuentra "Música".
 
-    BigQuery no tiene una funcion para sacar acentos, asi que se hace al reves:
-    cada vocal del texto buscado matchea tambien su version con tilde.
-    """
     partes = []
     for caracter in normalizar(texto):
         if caracter in VOCALES_CON_TILDE:
@@ -369,7 +342,10 @@ def consultar_agenda(fecha="hoy", categoria=None, busqueda=None,
             "UNA línea por evento, con este formato exacto: "
             "[titulo](url) — cuando, hora — entrada. "
             "Nada más: ni lugar, ni dirección, ni viñetas debajo. "
-            "El usuario abre el link si quiere el detalle."
+            "El usuario abre el link si quiere el detalle. "
+            "Si 'hay_mas' es true, cerrá con una sola línea diciendo cuántos hay "
+            "en total (el campo 'total') y que puede pedirte otros. "
+            "Si es false, no agregues nada al final."
         ),
     }
 

@@ -9,7 +9,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 PROYECTO = "agent-rosario"
 DATASET = "rosario_vivo"
 TABLA = f"`{PROYECTO}.{DATASET}.precios_gran_rosario`"
-LIMITE_POR_DEFECTO = 12
+LIMITE_POR_DEFECTO = 6
 MAX_LIMITE = 50
 
 _cliente = None
@@ -235,15 +235,20 @@ select
     id_producto,
     any_value(descripcion) as descripcion,
     count(distinct comercio) as cantidad_comercios,
-    min(precio_efectivo) as precio_minimo
+    min(precio_efectivo) as precio_minimo,
+    -- Misma relevancia que buscar_precios: sin esto, "leche" elegia leche en
+    -- polvo de 200 cc porque estaba en mas cadenas que el sachet de un litro.
+    max(case
+        when busqueda like concat(@principal, '%') then 3
+        when regexp_contains(busqueda, concat(r'\b', @principal, r'\b')) then 2
+        else 1
+    end) as relevancia
 from {TABLA}
 where {filtro_de_palabras('palabras')}
 group by id_producto
--- El que esta en mas cadenas primero: es el que sirve para comparar.
-order by cantidad_comercios desc, precio_minimo asc
+order by relevancia desc, cantidad_comercios desc, precio_minimo asc
 limit 1
 """
-
 SQL_COMPARAR = f"""
 select * except(puesto) from (
     select *,
@@ -269,7 +274,10 @@ def comparar_producto(producto):
             "Preguntale al usuario qué producto quiere comparar entre cadenas.",
         )
 
-    parametros = [bigquery.ArrayQueryParameter("palabras", "STRING", palabras)]
+    parametros = [
+        bigquery.ArrayQueryParameter("palabras", "STRING", palabras),
+        bigquery.ScalarQueryParameter("principal", "STRING", palabras[0]),
+    ]
     elegido, fallo = ejecutar(SQL_ELEGIR_PRODUCTO, parametros)
     if fallo:
         return fallo

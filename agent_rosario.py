@@ -433,7 +433,8 @@ CIERRES_DE_RELLENO = re.compile(
     r"\n\s*[¿¡]?\s*(si (necesit|tenés|tienes|querés|quieres|hay algo)|"
     r"cualquier (otra )?(cosa|duda)|no dudes en|estoy (acá|aquí) para|"
     r"necesit(ás|as) algo|quer(és|es) (que|saber|más)|te (sirve|ayudo)|"
-    r"avisame|decime si|espero que)[^\n]*$",
+    r"avisame|decime si|espero que|hay más [^\n]*decime|"
+    r"(si )?quer(és|es) más (detalles|info))[^\n]*$",
     re.IGNORECASE,
 )
 

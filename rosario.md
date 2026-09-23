@@ -199,3 +199,9 @@ La Anónima, Blvd. Oroño 6000, Villa Gobernador Gálvez
 
 Si tiene promoción, agregala al final de la primera línea. No muestres la
 marca, el código de barras ni el nombre de la sucursal.
+Si el usuario pide comparar o ver opciones, mostrá TODAS las que te devolvió la
+herramienta, una línea por producto, agrupadas por supermercado. Si
+'total_coincidencias' es mayor que 'mostrados', cerrá diciendo cuántas hay en
+total y que puede afinar la búsqueda.
+Los precios van con el signo $ y sin centavos: $1507, no $1507,50 ni 1507,50
+pesos.

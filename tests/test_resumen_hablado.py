@@ -59,3 +59,27 @@ def test_herramienta_sin_armador():
 
 def test_campo_que_cambio_de_nombre_no_rompe():
     assert resumen_hablado("planificar_viaje", {"directos": [{"otra_cosa": 1}]}) is None
+
+def test_comparar_dice_el_mas_barato_en_pesos():
+    r = resumen_hablado("comparar_producto", {
+        "por_comercio": [
+            {"comercio": "COTO CICSA", "precio": 5530.0, "tiene_promo": False},
+            {"comercio": "Axion", "precio": 7200.0, "tiene_promo": False},
+        ],
+        "diferencia_maxima": 1670.0,
+    })
+    assert "5.530 pesos" in r
+    assert "COTO CICSA" in r
+    assert "$" not in r  # el TTS leeria "dolares"
+    assert "demás opciones" in r
+
+
+def test_ningun_resumen_lleva_simbolo_de_peso():
+    r = resumen_hablado("buscar_precios", {
+        "mas_barato_por_unidad": {
+            "producto": "LECHE", "precio_envase": 1507.5, "precio_por_unidad": 1507.5,
+            "unidad": "l", "supermercado": "La Anonima",
+        },
+        "por_supermercado": [],
+    })
+    assert "$" not in r

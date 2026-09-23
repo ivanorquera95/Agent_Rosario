@@ -60,3 +60,10 @@ def test_pide_pronostico(texto, esperado):
 ])
 def test_limpia_cierres_de_relleno(cierre):
     assert limpiar_respuesta("Hace 13 grados." + cierre) == "Hace 13 grados."
+
+@pytest.mark.parametrize("cierre", [
+    "\n\nHay más eventos, si querés más detalles, decime.",
+    "\n\nSi querés más info, avisame.",
+])
+def test_limpia_cierres_vagos(cierre):
+    assert limpiar_respuesta("Dos eventos." + cierre) == "Dos eventos."
