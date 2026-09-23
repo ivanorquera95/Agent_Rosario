@@ -1,4 +1,6 @@
+import { useVoz } from './useVoz'
 import { useEffect, useState } from 'react'
+
 
 const CLAVE_SESION = 'rosario_sesion_id'
 
@@ -40,6 +42,7 @@ export function useRosario() {
   const [mensajes, setMensajes] = useState([])
   const [estado, setEstado] = useState('reposo') // reposo | pensando | hablando
   const [error, setError] = useState(null)
+  const voz = useVoz(sesionId)
 
   // useEffect: codigo que corre cuando algo cambia. Aca, al abrir la pagina
   // o al cambiar de conversacion, se trae lo que el servidor recuerda.
@@ -108,6 +111,7 @@ export function useRosario() {
           actualizarUltima((c) => c + evento.contenido)
         } else if (evento.tipo === 'fin') {
           actualizarUltima(() => evento.texto_limpio)
+          voz.hablar(evento.voz)
         } else if (evento.tipo === 'error') {
           throw new Error(evento.mensaje)
         }
@@ -134,7 +138,7 @@ export function useRosario() {
     setError(null)
   }
 
-  return { mensajes, estado, error, enviar, nuevaConversacion }
+  return { mensajes, estado, error, enviar, nuevaConversacion, voz }
 }
 
 function leerIdGuardado() {

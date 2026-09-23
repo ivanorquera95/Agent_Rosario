@@ -12,6 +12,9 @@ const TEXTO_INDICADOR = {
 
 export default function App() {
   const rosario = useRosario()
+  // Mientras la voz suena, los anillos siguen latiendo aunque el texto ya termino.
+  const estadoVisual = rosario.voz.hablando ? 'hablando' : rosario.estado
+
   return (
     <main className="app">
       <header className="barra">
@@ -20,11 +23,11 @@ export default function App() {
       </header>
 
       <section className="nucleo-zona">
-        <Anillos estado={rosario.estado} />
+        <Anillos estado={estadoVisual} />
         {/* aria-hidden: el estado ya lo anuncia el texto para lectores de Chat.jsx */}
-        <p className={`indicador ${rosario.estado}`} aria-hidden="true">
+        <p className={`indicador ${estadoVisual}`} aria-hidden="true">
           <span className="punto" />
-          {TEXTO_INDICADOR[rosario.estado]}
+          {TEXTO_INDICADOR[estadoVisual]}
         </p>
       </section>
 

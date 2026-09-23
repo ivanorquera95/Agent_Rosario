@@ -200,6 +200,13 @@
   font-size: 0.85rem;
 }
 
+.aviso {
+  color: #ffb347;
+  margin: 0 0 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
 .caja {
   display: flex;
   gap: 0.5rem;
@@ -259,6 +266,11 @@
   cursor: pointer;
 }
 
+.nueva.activo {
+  color: #ffb347;
+  border-color: #ffb347;
+}
+
 .caja button:disabled,
 .nueva:disabled {
   opacity: 0.4;
@@ -291,6 +303,11 @@
 @media (max-width: 600px) {
   .barra {
     font-size: 0.7rem;
+  }
+  
+  .pie-extra {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .mensajes {

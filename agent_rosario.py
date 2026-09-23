@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai import OpenAI, APIError
 
+
 RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(RAIZ_PROYECTO, "scripts"))
 from agenda.consultar_agenda import consultar_agenda
@@ -14,6 +15,7 @@ from precios.consultar_precios import (
     buscar_precios,
     comparar_producto,
 )
+from comun.resumen_hablado import resumen_hablado
 from descuentos.consultar_descuentos import consultar_descuentos
 from clima.clima import obtener_clima
 from monedas.monedas import obtener_cotizaciones
@@ -511,6 +513,8 @@ def responder_en_stream(mensajes):
     # Genera eventos a medida que ocurren: 'herramienta', 'texto', 'fin' o 'error'.
     # La terminal y la API consumen este mismo generador. Al terminar bien,
     # 'mensajes' queda con la respuesta final agregada.
+    # La voz resume el PRIMER resultado de la ultima herramienta que trajo datos.
+    voz = None
     for _ in range(MAX_PROFUNDIDAD):
         tool_choice = "required" if requiere_tool_choice_forzado(mensajes) else "auto"
 
@@ -551,7 +555,7 @@ def responder_en_stream(mensajes):
         if not llamadas:
             texto_limpio = limpiar_respuesta(texto)
             mensajes.append({"role": "assistant", "content": texto_limpio})
-            yield {"tipo": "fin", "texto_limpio": texto_limpio}
+            yield {"tipo": "fin", "texto_limpio": texto_limpio, "voz": voz or texto_limpio}
             return
 
         ordenadas = [llamadas[i] for i in sorted(llamadas)]
@@ -568,6 +572,7 @@ def responder_en_stream(mensajes):
         for l in ordenadas:
             yield {"tipo": "herramienta", "nombre": l["name"]}
             resultado = ejecutar_herramienta(l["name"], l["arguments"])
+            voz = resumen_hablado(l["name"], resultado) or voz
             if isinstance(resultado, dict) and resultado.get("error"):
                 print(f"      aviso: {resultado['error']}")
             mensajes.append({
@@ -580,7 +585,7 @@ def responder_en_stream(mensajes):
     texto_limpio = ("Me quedé dando vueltas con esa búsqueda y no llegué a nada firme. "
                     "¿Me lo pedís de nuevo con la dirección exacta?")
     mensajes.append({"role": "assistant", "content": texto_limpio})
-    yield {"tipo": "fin", "texto_limpio": texto_limpio}
+    yield {"tipo": "fin", "texto_limpio": texto_limpio, "voz": voz or texto_limpio}
 
 
 def main():

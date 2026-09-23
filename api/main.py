@@ -1,12 +1,17 @@
 import json
+import logging
+from openai import APIError
 
+logger = logging.getLogger(__name__)
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from fastapi.responses import Response
 
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
 from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
+from api.voz import LimiteVoz, devolver_turno, generar_audio, recortar, tomar_turno
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
 
@@ -99,3 +104,37 @@ def eventos_sse(sesion, mensaje):
             liberar_sesion(sesion, mensaje, historial[-1]["content"])
         else:
             liberar_sesion(sesion)
+            
+class PedidoVoz(BaseModel):
+    sesion_id: str
+    texto: str
+
+
+@app.post("/voz")
+def voz(pedido: PedidoVoz):
+    sesion_id = validar_id(pedido.sesion_id)
+    if sesion_id is None:
+        raise HTTPException(400, "sesion_id tiene que ser un UUID v4.")
+
+    texto = recortar(pedido.texto)
+    if not texto:
+        raise HTTPException(400, "No hay texto para leer.")
+
+    try:
+        restantes = tomar_turno(sesion_id)
+    except LimiteVoz as e:
+        # 429 = demasiados pedidos. El frontend muestra el mensaje tal cual.
+        raise HTTPException(429, e.mensaje)
+
+    try:
+        audio = generar_audio(texto)
+    except APIError as e:
+        devolver_turno(sesion_id)
+        logger.warning("Falló la generación de audio: %s", e)
+        raise HTTPException(503, "No pude generar el audio.")
+
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-store", "X-Audios-Restantes": str(restantes)},
+    )

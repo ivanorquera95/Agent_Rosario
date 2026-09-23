@@ -25,7 +25,7 @@ function conEnlaces(texto) {
   return partes
 }
 
-export default function Chat({ mensajes, estado, error, enviar, nuevaConversacion }) {
+export default function Chat({ mensajes, estado, error, enviar, nuevaConversacion, voz }) {
   const [texto, setTexto] = useState('')
   const ocupado = estado !== 'reposo'
   const listaRef = useRef(null)
@@ -82,6 +82,7 @@ export default function Chat({ mensajes, estado, error, enviar, nuevaConversacio
             {error}
           </p>
         )}
+        {voz.aviso && <p className="aviso">{voz.aviso}</p>}
         <form className="caja" onSubmit={alEnviar}>
           <input
             ref={cajaRef}
@@ -97,7 +98,21 @@ export default function Chat({ mensajes, estado, error, enviar, nuevaConversacio
           </button>
         </form>
         <div className="pie-extra">
-          <span>Las conversaciones se borran solas después de 2 horas sin actividad.</span>
+          <span>
+            {voz.activa
+              ? 'Audio limitado: 1 por minuto y 200 por día entre todos.'
+              : 'Las conversaciones se borran solas después de 2 horas sin actividad.'}
+          </span>
+          {voz.soportada && (
+            <button
+              type="button"
+              className={`nueva ${voz.activa ? 'activo' : ''}`}
+              onClick={voz.alternar}
+              aria-pressed={voz.activa}
+            >
+              {voz.activa ? '🔊 Escuchándome' : '🔈 Escuchame'}
+            </button>
+          )}
           <button type="button" className="nueva" onClick={nuevaConversacion} disabled={ocupado}>
             Nueva conversación
           </button>
