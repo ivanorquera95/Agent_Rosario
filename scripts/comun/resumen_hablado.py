@@ -61,14 +61,14 @@ def _paradas(resultado):
 
 
 def _precios(resultado):
-    barato = resultado.get("mas_barato_por_unidad")
+    barato = resultado.get("mas_conviene")
     if not barato:
         return None
 
-    frase = f"Lo más barato es {barato['producto']}, a {_pesos(barato['precio_envase'])}"
-    if barato.get("precio_por_unidad") and barato.get("unidad"):
-        frase += f", o sea {_pesos(barato['precio_por_unidad'])} el {barato['unidad']}"
-    frase += f", en {barato['supermercado']}"
+    frase = f"Lo que más conviene es {barato['producto']}"
+    if barato.get("contenido"):
+        frase += f", de {barato['contenido']}"
+    frase += f", a {_pesos(barato['precio'])}, en {barato['supermercado']}"
     if barato.get("direccion"):
         frase += f", {barato['direccion']}"
     frase += "."

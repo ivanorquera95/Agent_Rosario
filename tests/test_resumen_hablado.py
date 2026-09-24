@@ -25,18 +25,6 @@ def test_una_sola_opcion_no_ofrece_mas():
     assert "demás opciones" not in r
 
 
-def test_precio_redondea_los_centavos():
-    r = resumen_hablado("buscar_precios", {
-        "mas_barato_por_unidad": {
-            "producto": "LECHE ENTERA", "precio_envase": 1507.5, "precio_por_unidad": 1507.5,
-            "unidad": "l", "supermercado": "La Anonima", "direccion": "Blvd. Oroño 6000",
-        },
-        "por_supermercado": [{"supermercado": "La Anonima", "productos": [{}, {}]}],
-    })
-    assert "1.508 pesos" in r
-    assert "Blvd. Oroño 6000" in r
-
-
 def test_agenda_menciona_solo_el_primero():
     r = resumen_hablado("consultar_agenda", {
         "eventos": [
@@ -72,14 +60,29 @@ def test_comparar_dice_el_mas_barato_en_pesos():
     assert "COTO CICSA" in r
     assert "$" not in r  # el TTS leeria "dolares"
     assert "demás opciones" in r
+  
 
-
-def test_ningun_resumen_lleva_simbolo_de_peso():
+def test_precio_muestra_contenido_y_no_el_kilo():
     r = resumen_hablado("buscar_precios", {
-        "mas_barato_por_unidad": {
-            "producto": "LECHE", "precio_envase": 1507.5, "precio_por_unidad": 1507.5,
-            "unidad": "l", "supermercado": "La Anonima",
+        "mas_conviene": {
+            "producto": "ALFAJOR CHOCOLATE GUAYMALLEN", "contenido": "38 GRS",
+            "precio": 600.0, "supermercado": "La Anonima", "direccion": "Blvd. Oroño 6000",
+        },
+        "por_supermercado": [{"supermercado": "La Anonima", "productos": [{}, {}]}],
+    })
+    assert "38 GRS" in r
+    assert "600 pesos" in r
+    assert "kilo" not in r
+    assert "$" not in r  # el TTS leeria "dolares"
+    assert "demás opciones" in r
+
+
+def test_precio_redondea_los_centavos():
+    r = resumen_hablado("buscar_precios", {
+        "mas_conviene": {
+            "producto": "LECHE ENTERA", "contenido": "1000 GRM", "precio": 1507.5,
+            "supermercado": "La Anonima",
         },
         "por_supermercado": [],
     })
-    assert "$" not in r
+    assert "1.508 pesos" in r

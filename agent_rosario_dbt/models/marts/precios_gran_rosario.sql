@@ -56,6 +56,8 @@ select
     p.unidad_comparable,
     p.cantidad_referencia,
     p.unidad_referencia,
+    p.contenido_chico,
+    p.contenido_grande,
 
     c.nombre_bandera as comercio,
     c.razon_social,

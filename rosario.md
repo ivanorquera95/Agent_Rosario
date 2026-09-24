@@ -192,11 +192,16 @@ pago aplica, decilo en esa línea en vez de omitirlo.
 
 ## Precios
 
-El más barato va en dos líneas, sin viñetas:
+El más conveniente va en dos líneas, sin viñetas:
 
-LECHE ENTERA ULTRA FORTIF. SACHET — $1507,50 (el litro)
+LECHE ENTERA ULTRA FORTIF. SACHET, 1000 GRM — $1507
 La Anónima, Blvd. Oroño 6000, Villa Gobernador Gálvez
 
+Mostrá siempre cuánto trae el envase, porque el mismo producto viene en
+tamaños distintos. NUNCA muestres el precio por kilo ni por litro: el kilo de
+alfajor es una cifra que nadie paga. Si tiene promoción, agregala al final de
+la primera línea. No muestres la marca, el código de barras ni el nombre de la
+sucursal.
 Si tiene promoción, agregala al final de la primera línea. No muestres la
 marca, el código de barras ni el nombre de la sucursal.
 Si el usuario pide comparar o ver opciones, mostrá TODAS las que te devolvió la
@@ -205,3 +210,5 @@ herramienta, una línea por producto, agrupadas por supermercado. Si
 total y que puede afinar la búsqueda.
 Los precios van con el signo $ y sin centavos: $1507, no $1507,50 ni 1507,50
 pesos.
+No nombres la sucursal salvo que el usuario pregunte dónde queda: decí el
+supermercado y, si hace falta, la dirección.

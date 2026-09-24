@@ -128,6 +128,22 @@ order by relevancia desc, precio_por_unidad asc nulls last, precio_efectivo asc
 limit @limite
 """
 
+def contenido_de(fila):
+    # cantidad_referencia es el campo malo de la fuente: para dos yerbas de 500
+    # gr dice "100 gr." y "1 KG.". Lo que la descripcion trae es correcto, y ya
+    # se lee en dbt para calcular el precio por unidad.
+    liquido = fila.unidad_comparable == "l"
+    if fila.contenido_chico:
+        # 1000 ml se lee peor que 1 l.
+        if fila.contenido_chico >= 1000:
+            return f"{fila.contenido_chico / 1000:g} {'l' if liquido else 'kg'}"
+        return f"{fila.contenido_chico:g} {'ml' if liquido else 'g'}"
+    if fila.contenido_grande:
+        return f"{fila.contenido_grande:g} {'l' if liquido else 'kg'}"
+    if fila.cantidad_referencia:
+        return f"{fila.cantidad_referencia:g} {fila.unidad_referencia}"
+    return fila.unidad_presentacion
+
 
 def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, limite=LIMITE_POR_DEFECTO):
     #¿donde esta mas barata la leche?" -> buscar_precios("leche")
@@ -178,11 +194,11 @@ def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, l
         por_supermercado.setdefault(fila.comercio, []).append({
             "producto": fila.descripcion,
             "marca": fila.marca,
-            "presentacion": f"{fila.cantidad_presentacion} {fila.unidad_presentacion}",
+            # Lo que el usuario necesita para decidir: cuánto paga y cuánto
+            # trae. El precio por kilo/litro se usa para ordenar, no se muestra:
+            # "$15.789 el kilo de alfajor" es una cifra que nadie va a pagar.
+            "contenido": contenido_de(fila),
             "precio": fila.precio_efectivo,
-            "precio_por_unidad": fila.precio_por_unidad,
-            "unidad": fila.unidad_comparable,
-            "unidad_referencia": fila.unidad_referencia,
             "precio_lista": fila.precio_lista,
             "tiene_promo": fila.tiene_promo,
             "promo": fila.leyenda_promo1,
@@ -199,27 +215,27 @@ def buscar_precios(producto, comercio=None, localidad=None, solo_promos=False, l
         "total_coincidencias": filas[0].total_filas,
         "mostrados": len(filas),
         "fecha_datos": filas[0].fecha_extraccion.isoformat(),
-        "ordenado_por": "precio por unidad de medida (litro o kilo), no por "
-                        "precio del envase",
+        "ordenado_por": "el que más conviene por cantidad de producto",
         "aviso": "Precios de la última publicación de SEPA, puede no coincidir "
                  "con la góndola de hoy.",
-        "mas_barato_por_unidad": {
+        "mas_conviene": {
             "producto": ganador.descripcion,
+            "contenido": contenido_de(ganador),
+            "precio": ganador.precio_efectivo,
             "supermercado": ganador.comercio,
-            "precio_por_unidad": ganador.precio_por_unidad,
-            "unidad": ganador.unidad_comparable,
-            "precio_envase": ganador.precio_efectivo,
-            "sucursal": ganador.sucursal,
             "direccion": ganador.sucursal_direccion,
             "localidad": ganador.localidad,
+            "tiene_promo": ganador.tiene_promo,
+            "promo": ganador.leyenda_promo1,
         } if ganador else None,
         "como_responder": (
-            "Si preguntó por el más barato, mostrá SOLO 'mas_barato_por_unidad', "
-            "en dos líneas: el producto con el precio del envase y, entre "
-            "paréntesis, a cuánto sale el kilo o el litro; abajo el supermercado "
-            "con la dirección. Nada de marca, código ni sucursal. "
-            "El más barato es el de menor precio por kilo o litro: NO elijas el "
-            "número más chico de 'precio', que es el del envase."
+            "Mostrá el producto con su contenido y el precio que se paga: "
+            "'ALFAJOR CHOCOLATE GUAYMALLEN X 38 GRS — $600'. "
+            "NUNCA muestres el precio por kilo ni por litro. "
+            "Si preguntó cuál conviene, mostrá SOLO 'mas_conviene', en dos "
+            "líneas: producto con contenido y precio; abajo el supermercado con "
+            "la dirección. Ya vienen ordenados: el primero es el que más "
+            "conviene por cantidad de producto."
         ),
         "por_supermercado": [
               {"supermercado": nombre, "productos": productos}
@@ -316,7 +332,9 @@ def comparar_producto(producto):
                 "precio_lista": fila.precio_lista,
                 "tiene_promo": fila.tiene_promo,
                 "promo": fila.leyenda_promo1,
-                "sucursal": fila.sucursal,
+                # Coto tiene una sucursal llamada "LA REINA": sin el comercio
+                # adelante, se confunde con la cadena La Reina.
+                "sucursal": f"{fila.comercio} {fila.sucursal}",
                 "localidad": fila.localidad,
             }
             for fila in filas
@@ -345,9 +363,7 @@ def mostrar(resultado):
         print(f"  {grupo['supermercado']}")
         for r in grupo["productos"]:
             promo = "  [promo]" if r["tiene_promo"] else ""
-            unidad = (f"${r['precio_por_unidad']:>9,.2f}/{r['unidad']}"
-                      if r["precio_por_unidad"] else "        s/d")
-            print(f"    {unidad}   ${r['precio']:>9,.2f}  {r['producto'][:50]}{promo}")
+            print(f"    ${r['precio']:>9,.2f}  {r['contenido']:>10}  {r['producto'][:44]}{promo}")
 
 
 if __name__ == "__main__":
