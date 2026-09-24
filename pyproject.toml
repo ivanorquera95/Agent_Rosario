@@ -18,6 +18,7 @@ dependencies = [
     "pyarrow>=25.0.1",
     "pyproj>=3.7.2",
     "python-dotenv>=1.2.3",
+    "python-multipart>=0.0.32",
     "requests>=2.34.2",
     "tzdata>=2026.3",
     "uvicorn>=0.53.0",

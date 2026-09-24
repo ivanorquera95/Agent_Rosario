@@ -138,7 +138,7 @@ export function useRosario() {
     setError(null)
   }
 
-  return { mensajes, estado, error, enviar, nuevaConversacion, voz }
+  return { sesionId, mensajes, estado, error, enviar, nuevaConversacion, voz }
 }
 
 function leerIdGuardado() {

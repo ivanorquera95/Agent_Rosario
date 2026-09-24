@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useMicrofono } from './useMicrofono'
+import { IconoDetener, IconoMicrofono, IconoPuntos, IconoVolumen } from './Iconos'
 
 const TEXTO_ESTADO = {
   reposo: '',
@@ -25,9 +27,12 @@ function conEnlaces(texto) {
   return partes
 }
 
-export default function Chat({ mensajes, estado, error, enviar, nuevaConversacion, voz }) {
+export default function Chat({ mensajes, estado, error, enviar, nuevaConversacion, voz, sesionId }) {
   const [texto, setTexto] = useState('')
   const ocupado = estado !== 'reposo'
+  // Lo que se dictó entra en la caja de texto para que el usuario lo revise
+  // antes de enviar: el modelo transcribe bien pero no perfecto.
+  const microfono = useMicrofono(sesionId, (texto) => setTexto(texto))
   const listaRef = useRef(null)
   const cajaRef = useRef(null)
   const largoAnterior = useRef(0)
@@ -83,6 +88,7 @@ export default function Chat({ mensajes, estado, error, enviar, nuevaConversacio
           </p>
         )}
         {voz.aviso && <p className="aviso">{voz.aviso}</p>}
+        {microfono.aviso && <p className="aviso">{microfono.aviso}</p>}
         <form className="caja" onSubmit={alEnviar}>
           <input
             ref={cajaRef}
@@ -93,6 +99,17 @@ export default function Chat({ mensajes, estado, error, enviar, nuevaConversacio
             placeholder="Preguntale a Rosario"
             aria-label="Mensaje para Rosario"
           />
+          {microfono.soportado && (
+            <button
+              type="button"
+              className={`microfono ${microfono.grabando ? 'grabando' : ''}`}
+              onClick={microfono.grabando ? microfono.frenar : microfono.empezar}
+              disabled={ocupado || microfono.transcribiendo}
+              aria-label={microfono.grabando ? 'Terminar de grabar' : 'Grabar un mensaje'}
+            >
+              {microfono.transcribiendo ? <IconoPuntos /> : microfono.grabando ? <IconoDetener /> : <IconoMicrofono />}
+            </button>
+          )}
           <button type="submit" disabled={ocupado || !texto.trim()}>
             Enviar
           </button>
@@ -110,7 +127,8 @@ export default function Chat({ mensajes, estado, error, enviar, nuevaConversacio
               onClick={voz.alternar}
               aria-pressed={voz.activa}
             >
-              {voz.activa ? '🔊 Escuchándome' : '🔈 Escuchame'}
+              <IconoVolumen activo={voz.activa} />
+              {voz.activa ? 'Escuchándome' : 'Escuchame'}
             </button>
           )}
           <button type="button" className="nueva" onClick={nuevaConversacion} disabled={ocupado}>

@@ -10,6 +10,7 @@ export default defineConfig({
       '/chat': 'http://127.0.0.1:8000',
       '/historial': 'http://127.0.0.1:8000',
       '/voz': 'http://127.0.0.1:8000',
+      '/transcribir': 'http://127.0.0.1:8000',
     },
   },
 })

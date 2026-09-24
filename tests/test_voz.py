@@ -3,6 +3,11 @@ from api.voz import MAX_CARACTERES, recortar
 import pytest
 from api import voz as modulo_voz
 from api.voz import LimiteVoz, MAX_POR_DIA, SEGUNDOS_ENTRE_AUDIOS, devolver_turno, tomar_turno
+from api.voz import (
+    MAX_TRANSCRIPCIONES_POR_DIA, SEGUNDOS_ENTRE_TRANSCRIPCIONES,
+    tomar_turno_transcripcion,
+)
+
 
 
 def test_texto_corto_queda_igual():
@@ -53,3 +58,25 @@ def test_si_falla_openai_no_se_cobra_el_turno():
     tomar_turno("a", ahora=100)
     devolver_turno("a")
     tomar_turno("a", ahora=101)  # puede reintentar enseguida
+    
+
+def test_transcripcion_espera_entre_grabaciones():
+    modulo_voz._dia_tr = None
+    modulo_voz._usados_tr = 0
+    modulo_voz._ultimo_tr_por_sesion.clear()
+
+    tomar_turno_transcripcion("a", ahora=100)
+    with pytest.raises(LimiteVoz):
+        tomar_turno_transcripcion("a", ahora=101)
+    tomar_turno_transcripcion("a", ahora=100 + SEGUNDOS_ENTRE_TRANSCRIPCIONES)
+
+
+def test_transcripcion_tope_diario():
+    modulo_voz._dia_tr = None
+    modulo_voz._usados_tr = 0
+    modulo_voz._ultimo_tr_por_sesion.clear()
+
+    for i in range(MAX_TRANSCRIPCIONES_POR_DIA):
+        tomar_turno_transcripcion(f"sesion-{i}", ahora=100)
+    with pytest.raises(LimiteVoz, match="límite"):
+        tomar_turno_transcripcion("otra", ahora=100)

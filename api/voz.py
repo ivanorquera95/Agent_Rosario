@@ -19,6 +19,11 @@ _ultimo_por_sesion = {}
 MODELO_VOZ = "gpt-4o-mini-tts"
 VOZ = "coral"
 MAX_CARACTERES = 600
+MODELO_TRANSCRIPCION = "gpt-4o-mini-transcribe"
+MAX_SEGUNDOS_AUDIO = 60
+MAX_BYTES_AUDIO = 5 * 1024 * 1024
+SEGUNDOS_ENTRE_TRANSCRIPCIONES = 3
+MAX_TRANSCRIPCIONES_POR_DIA = 200
 
 
 # El resumen hablado es corto, pero si no hubo herramienta se habla el texto del
@@ -80,3 +85,42 @@ def devolver_turno(sesion_id):
     with _candado:
         _usados = max(0, _usados - 1)
         _ultimo_por_sesion.pop(sesion_id, None)
+
+def transcribir(audio, nombre="audio.webm"):
+    # Devuelve el texto que dijo el usuario.
+    respuesta = client.audio.transcriptions.create(
+        model=MODELO_TRANSCRIPCION,
+        file=(nombre, audio),
+        language="es",
+        # El modelo escribe mejor los nombres propios si sabe de qué se habla.
+        prompt="Consulta sobre Rosario: colectivos, líneas, calles, supermercados, descuentos, precios, clima o eventos.",
+    )
+    return (respuesta.text or "").strip()
+
+
+# Contadores propios: transcribir es mas barato que generar audio, asi que el
+# limite es mas holgado. Misma mecanica en memoria que tomar_turno.
+_dia_tr = None
+_usados_tr = 0
+_ultimo_tr_por_sesion = {}
+
+
+def tomar_turno_transcripcion(sesion_id, ahora=None):
+    global _dia_tr, _usados_tr
+    ahora = ahora or time.monotonic()
+    hoy = date.today()
+
+    with _candado:
+        if _dia_tr != hoy:
+            _dia_tr, _usados_tr = hoy, 0
+            _ultimo_tr_por_sesion.clear()
+
+        ultimo = _ultimo_tr_por_sesion.get(sesion_id)
+        if ultimo is not None and ahora - ultimo < SEGUNDOS_ENTRE_TRANSCRIPCIONES:
+            raise LimiteVoz("Esperá un momento antes de volver a grabar.")
+
+        if _usados_tr >= MAX_TRANSCRIPCIONES_POR_DIA:
+            raise LimiteVoz("Por hoy llegué al límite de audios. Escribime el mensaje.")
+
+        _usados_tr += 1
+        _ultimo_tr_por_sesion[sesion_id] = ahora

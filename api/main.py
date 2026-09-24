@@ -3,7 +3,7 @@ import logging
 from openai import APIError
 
 logger = logging.getLogger(__name__)
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
@@ -11,7 +11,10 @@ from fastapi.responses import Response
 
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
 from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
-from api.voz import LimiteVoz, devolver_turno, generar_audio, recortar, tomar_turno
+from api.voz import (
+    LimiteVoz, MAX_BYTES_AUDIO, devolver_turno, generar_audio, recortar,
+    tomar_turno, tomar_turno_transcripcion, transcribir,
+)
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
 
@@ -138,3 +141,32 @@ def voz(pedido: PedidoVoz):
         media_type="audio/mpeg",
         headers={"Cache-Control": "no-store", "X-Audios-Restantes": str(restantes)},
     )
+
+@app.post("/transcribir")
+async def transcribir_audio(sesion_id: str = Form(...), audio: UploadFile = File(...)):
+    # El audio va como archivo, no como JSON: por eso Form y File en vez de un modelo.
+    sesion_validada = validar_id(sesion_id)
+    if sesion_validada is None:
+        raise HTTPException(400, "sesion_id tiene que ser un UUID v4.")
+
+    datos = await audio.read()
+    if not datos:
+        raise HTTPException(400, "El audio llegó vacío.")
+    if len(datos) > MAX_BYTES_AUDIO:
+        raise HTTPException(413, "El audio es demasiado largo.")
+
+    try:
+        tomar_turno_transcripcion(sesion_validada)
+    except LimiteVoz as e:
+        raise HTTPException(429, e.mensaje)
+
+    try:
+        texto = transcribir(datos, audio.filename or "audio.webm")
+    except APIError as e:
+        logger.warning("Falló la transcripción: %s", e)
+        raise HTTPException(503, "No pude entender el audio. Probá de nuevo.")
+
+    if not texto:
+        raise HTTPException(422, "No se escuchó nada. Probá de nuevo.")
+
+    return {"texto": texto}

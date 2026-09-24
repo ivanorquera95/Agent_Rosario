@@ -245,6 +245,19 @@
   background: rgba(79, 209, 255, 0.1);
 }
 
+.caja .microfono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.8rem;
+}
+
+.caja .microfono.grabando {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+  animation: parpadeo 1s ease-in-out infinite;
+}
+
 .pie-extra {
   display: flex;
   justify-content: space-between;
@@ -256,6 +269,9 @@
 }
 
 .nueva {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.3rem 0.6rem;
   font-size: 0.75rem;
   color: #c9d4e3;
@@ -293,7 +309,8 @@
 @media (prefers-reduced-motion: reduce) {
   .anillos,
   .anillos *,
-  .indicador .punto {
+  .indicador .punto,
+  .caja .microfono.grabando {
     animation: none !important;
   }
 }
