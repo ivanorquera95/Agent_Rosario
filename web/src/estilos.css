@@ -45,6 +45,20 @@
   color: #7fa7c4;
 }
 
+.indicador .nombre {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 1.1rem;
+  letter-spacing: 0.35em;
+  color: #4fd1ff;
+  transition: color 0.6s;
+}
+
+.indicador.pensando .nombre,
+.indicador.hablando .nombre {
+  color: #ffb347;
+}
+
 .indicador .punto {
   display: inline-block;
   width: 8px;
@@ -82,24 +96,131 @@
 .anillos.pensando,
 .anillos.hablando {
   --color: #ffb347; /* ambar: trabajando */
-  filter: drop-shadow(0 0 10px var(--color));
+  filter: drop-shadow(0 0 8px var(--color));
 }
 
 .anillos circle {
   fill: none;
   stroke: var(--color);
+  stroke-linecap: round; /* puntas redondeadas: los guiones dejan de verse rectos */
   transition: stroke 0.6s;
+  filter: drop-shadow(0 0 1.5px var(--color));
 }
+
+/* Los externos dan la estructura; los internos van mas tenues para que el
+   conjunto no se sature y se distinga cada capa. */
+.anillo-1 circle { stroke-opacity: 0.85; }
+.anillo-2 circle { stroke-opacity: 0.9; }
+.anillo-4 circle { stroke-opacity: 0.5; }
+.anillo-5 circle { stroke-opacity: 0.4; }
 
 .anillos .nucleo {
-  fill: var(--color);
-  fill-opacity: 0.08;
+  fill: url(#nucleo-luz);
+  stroke: none;
+  animation: respirar 4s ease-in-out infinite;
 }
 
-.anillos text {
-  fill: var(--color);
-  font-size: 11px;
-  transition: fill 0.6s;
+/* El borde del nucleo: un aro nitido que lo separa del centro difuso. */
+.anillos .halo {
+  fill: none;
+  stroke: var(--color);
+  stroke-width: 1.25;
+  stroke-opacity: 0.7;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: halo_respirar 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 2px var(--color));
+}
+/* ------------------------------------------------- Marcas de escala */
+
+/* Las rayitas finas son lo que da la sensacion de instrumento: muchas, chicas
+   y a distintas opacidades, en vez de pocas lineas gruesas. */
+.anillos .escala line {
+  stroke: var(--color);
+  stroke-width: 0.6;
+  stroke-linecap: butt;
+}
+
+.anillos .escala {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.escala-externa {
+  stroke-opacity: 0.85;
+  animation: girar 90s linear infinite;
+}
+
+.escala-interna {
+  stroke-opacity: 0.5;
+  animation: girar 25s linear infinite reverse;
+}
+
+/* El acento en ambar resalta sobre el celeste. Cuando Rosario ya esta en
+   ambar, pasa a blanco para seguir destacandose. */
+.acento {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: girar 18s linear infinite;
+}
+
+.anillos .arco-acento {
+  fill: none;
+  stroke: #ffb347;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px #ffb347);
+}
+
+.anillos .escala-arco line {
+  stroke: #ffb347;
+  stroke-width: 1;
+  stroke-opacity: 0.9;
+}
+
+.anillos.pensando .arco-acento,
+.anillos.hablando .arco-acento,
+.anillos.pensando .escala-arco line,
+.anillos.hablando .escala-arco line {
+  stroke: #ffffff;
+  filter: drop-shadow(0 0 3px #ffffff);
+}
+
+/* Al trabajar, las escalas se aceleran como los anillos. */
+.anillos.pensando .escala-externa,
+.anillos.hablando .escala-externa { animation-duration: 20s; }
+
+.anillos.pensando .escala-interna,
+.anillos.hablando .escala-interna { animation-duration: 6s; }
+
+.anillos.pensando .acento,
+.anillos.hablando .acento { animation-duration: 4s; }
+
+
+/* El nucleo late despacio siempre: es lo que lo hace ver vivo y no dibujado.
+   Escala y opacidad juntas, para que se sienta prendido y apagado. */
+@keyframes respirar {
+  0%, 100% { transform: scale(0.92); opacity: 0.55; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+/* El borde pulsa junto al nucleo pero sin desaparecer: es la linea que lo define. */
+@keyframes halo_respirar {
+  0%, 100% { stroke-opacity: 0.7; transform: scale(1.02); }
+  50% { stroke-opacity: 1; transform: scale(0.98); }
+}
+
+.anillos.pensando .nucleo,
+.anillos.hablando .nucleo,
+.anillos.pensando .halo,
+.anillos.hablando .halo {
+  animation-duration: 1.2s;
+}
+
+/* El nucleo escala sobre su propio centro. */
+.anillos .nucleo {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 /* Que cada grupo gire sobre su propio centro y no sobre la esquina del SVG. */

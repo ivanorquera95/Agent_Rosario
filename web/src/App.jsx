@@ -26,6 +26,7 @@ export default function App() {
         <Anillos estado={estadoVisual} />
         {/* aria-hidden: el estado ya lo anuncia el texto para lectores de Chat.jsx */}
         <p className={`indicador ${estadoVisual}`} aria-hidden="true">
+          <span className="nombre">ROSARIO</span>
           <span className="punto" />
           {TEXTO_INDICADOR[estadoVisual]}
         </p>
