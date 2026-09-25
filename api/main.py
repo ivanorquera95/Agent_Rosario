@@ -12,7 +12,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-
+from fastapi.middleware.cors import CORSMiddleware
+from api.seguridad import CabecerasDeSeguridad, LimiteDeTamano, origenes_permitidos
 from api.limites import LimiteAlcanzado, tomar_turno_chat
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
 from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
@@ -37,6 +38,23 @@ async def ciclo_de_vida(app):
 # poniendo docs_url="/docs".
 app = FastAPI(title="Rosario Vivo", lifespan=ciclo_de_vida, docs_url=None, redoc_url=None, openapi_url=None)
 
+# El orden importa: el ultimo que se agrega es el primero que se ejecuta, asi
+# que el limite de tamano corta antes de que se procese nada.
+app.add_middleware(CabecerasDeSeguridad)
+
+origenes = origenes_permitidos()
+if origenes:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origenes,
+        allow_methods=["POST"],
+        allow_headers=["Content-Type"],
+        # Sin credenciales: la sesion va en el cuerpo, no en cookies.
+        allow_credentials=False,
+        max_age=600,
+    )
+
+app.add_middleware(LimiteDeTamano)
 
 def ip_de(request):
     # Detras de nginx, la IP real viene en X-Forwarded-For; sin proxy, en client.
