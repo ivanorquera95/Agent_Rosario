@@ -100,6 +100,10 @@ export function useRosario() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sesion_id: sesionId, mensaje: texto }),
       })
+      if (respuesta.status === 429) {
+        const datos = await respuesta.json().catch(() => ({}))
+        throw new Error(datos.detail || 'Esperá unos segundos.')
+      }
       if (respuesta.status === 409) throw new Error('Estoy respondiendo en otra pestaña. Esperá un momento.')
       if (!respuesta.ok) throw new Error('No pude enviar el mensaje.')
 

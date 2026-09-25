@@ -2,13 +2,18 @@ import json
 import logging
 from openai import APIError
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-from fastapi.responses import Response
 
+from api.limites import LimiteAlcanzado, tomar_turno_chat
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
 from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
 from api.voz import (
@@ -27,7 +32,34 @@ async def ciclo_de_vida(app):
     yield
 
 
-app = FastAPI(title="Rosario Vivo", lifespan=ciclo_de_vida)
+# Sin docs ni openapi: exponen todos los endpoints y sus parametros, y en una
+# demo publica no aportan nada. Se pueden volver a activar en desarrollo
+# poniendo docs_url="/docs".
+app = FastAPI(title="Rosario Vivo", lifespan=ciclo_de_vida, docs_url=None, redoc_url=None, openapi_url=None)
+
+
+def ip_de(request):
+    # Detras de nginx, la IP real viene en X-Forwarded-For; sin proxy, en client.
+    reenviada = request.headers.get("x-forwarded-for")
+    if reenviada:
+        return reenviada.split(",")[0].strip()
+    return request.client.host if request.client else "desconocida"
+
+
+@app.exception_handler(RequestValidationError)
+async def error_de_validacion(request, exc):
+    # El detalle de pydantic describe la estructura interna de los modelos:
+    # util en desarrollo, informacion de mas en una API publica.
+    logger.info("Pedido invalido en %s desde %s", request.url.path, ip_de(request))
+    return JSONResponse(status_code=422, content={"detail": "El pedido no tiene el formato esperado."})
+
+
+@app.exception_handler(Exception)
+async def error_inesperado(request, exc):
+    # Lo que no atrapamos en otro lado: se registra completo y al usuario le
+    # llega un mensaje sin datos internos.
+    logger.exception("Error inesperado en %s desde %s", request.url.path, ip_de(request))
+    return JSONResponse(status_code=500, content={"detail": "Algo falló de mi lado. Probá de nuevo."})
 
 
 class Pedido(BaseModel):
@@ -55,7 +87,12 @@ def historial(pedido: PedidoHistorial):
     return {"mensajes": leer_historial(sesion_id)}
 
 @app.post("/chat")
-def chat(pedido: Pedido):
+def chat(pedido: Pedido, request: Request):
+    try:
+        tomar_turno_chat(ip_de(request))
+    except LimiteAlcanzado as e:
+        raise HTTPException(429, e.mensaje)
+
     sesion_id = validar_id(pedido.sesion_id)
     if sesion_id is None:
         raise HTTPException(400, "sesion_id tiene que ser un UUID v4.")
