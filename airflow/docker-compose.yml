@@ -6,7 +6,7 @@ x-comun: &comun
   build: .
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USUARIO}:${AIRFLOW_DB_CLAVE}@postgres/airflow
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     # Los scripts usan rutas relativas (data/raw/...), asi que todo corre
@@ -32,13 +32,13 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
+      POSTGRES_USER: ${AIRFLOW_DB_USUARIO}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_CLAVE}
       POSTGRES_DB: airflow
     volumes:
       - postgres-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "${AIRFLOW_DB_USUARIO}"]
       interval: 10s
       retries: 5
 
@@ -49,7 +49,7 @@ services:
       - -c
       - |
         airflow db migrate
-        airflow users create --username admin --password admin \
+        airflow users create --username "${AIRFLOW_ADMIN_USUARIO}" --password "${AIRFLOW_ADMIN_CLAVE}" \
           --firstname Ivan --lastname Orquera --role Admin --email ivanorquera9@gmail.com \
           || true
     restart: "no"

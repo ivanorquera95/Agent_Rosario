@@ -21,8 +21,10 @@ from api.voz import (
     LimiteVoz, MAX_BYTES_AUDIO, devolver_turno, generar_audio, recortar,
     tomar_turno, tomar_turno_transcripcion, transcribir,
 )
+from pathlib import Path
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
+from fastapi.staticfiles import StaticFiles
 
 MAX_LARGO_MENSAJE = 1000
 
@@ -225,3 +227,9 @@ async def transcribir_audio(sesion_id: str = Form(...), audio: UploadFile = File
         raise HTTPException(422, "No se escuchó nada. Probá de nuevo.")
 
     return {"texto": texto}
+
+# El frontend compilado, cuando existe (en produccion). En desarrollo lo sirve
+# Vite, asi que esta carpeta no esta y el bloque se saltea.
+DIST = Path(__file__).parent.parent / "web" / "dist"
+if DIST.is_dir():
+    app.mount("/", StaticFiles(directory=DIST, html=True), name="web")

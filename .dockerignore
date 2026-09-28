@@ -1,0 +1,12 @@
+.venv
+web/node_modules
+web/dist
+data
+logs
+airflow
+agent_rosario_dbt
+tests
+docs
+.git
+.env
+**/__pycache__
