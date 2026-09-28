@@ -16,6 +16,7 @@ data/
 .env
 *.json
 !package.json
+!package-lock.json
 
 # entorno
 .venv/
