@@ -1,7 +1,7 @@
 import json
 import logging
 from openai import APIError
-
+import os
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -15,6 +15,21 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from api.seguridad import CabecerasDeSeguridad, LimiteDeTamano, origenes_permitidos
 from api.limites import LimiteAlcanzado, tomar_turno_chat
+# Railway no permite subir archivos, asi que la credencial de Google viaja como
+# variable de entorno y se escribe a disco al arrancar. El archivo vive solo en
+# el contenedor, que es efimero.
+def preparar_credenciales_google():
+    credenciales = os.getenv("GOOGLE_CREDENCIALES_JSON")
+    if not credenciales:
+        return
+    ruta = Path("/tmp/gcp.json")
+    ruta.write_text(credenciales, encoding="utf-8")
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(ruta)
+
+
+preparar_credenciales_google()
+
+
 from agent_rosario import SYSTEM_PROMPT, podar_historial, responder_en_stream
 from api.sesiones import SesionOcupada, crear_esquema, liberar_sesion, tomar_sesion, validar_id, leer_historial
 from api.voz import (
@@ -25,6 +40,7 @@ from pathlib import Path
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
 from fastapi.staticfiles import StaticFiles
+
 
 MAX_LARGO_MENSAJE = 1000
 
