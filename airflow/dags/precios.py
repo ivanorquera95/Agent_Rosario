@@ -1,4 +1,4 @@
-#Precios de SEPA para el Gran Rosario. Todos los dias a las 15.
+#Precios de SEPA para el Gran Rosario. De lunes a viernes a las 15.
 
 
 from datetime import datetime, timedelta
@@ -18,7 +18,10 @@ ARGUMENTOS = {
 with DAG(
     dag_id="precios",
     description="Precios de supermercados del Gran Rosario (SEPA)",
-    schedule="0 15 * * *",
+    # SEPA solo responde de lunes a viernes: el sitio esta caido los fines de
+    # semana (verificado sabado, domingo y lunes). Sin esto el DAG falla dos
+    # veces por semana por una razon que no es nuestra.
+    schedule="0 15 * * 1-5",
     start_date=datetime(2026, 9, 1, tzinfo=ZONA),
     # Sin catchup: SEPA publica una foto del dia. Correr los dias que
     # pasaron bajaria el archivo de hoy una y otra vez.
