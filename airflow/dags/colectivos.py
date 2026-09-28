@@ -36,4 +36,14 @@ with DAG(
         execution_timeout=timedelta(minutes=30),
     )
 
-    extraer >> subir
+    transformar = BashOperator(
+        task_id="dbt",
+        bash_command=(
+            f"cd {PROYECTO}/agent_rosario_dbt && "
+            "dbt build --profiles-dir . --select "
+            "stg_colectivos_lineas stg_colectivos_paradas stg_colectivos_trazados"
+        ),
+        execution_timeout=timedelta(minutes=20),
+    )
+
+    extraer >> subir >> transformar

@@ -1,15 +1,21 @@
 #Busca colectivos directos verificando el sentido contra el recorrido real.
 #Los datos salen de extraccion_recorridos.py. Solo cubre las 53 lineas urbanas
 
+
+import math
+from pathlib import Path
 import sys
 import os
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import csv
 import math
 from pathlib import Path
 
+PROYECTO_BQ = "agent-rosario"
+DATASET_BQ = "rosario_vivo"
+# Los recorridos salen de BigQuery, igual que el resto de los datos: el
+# contenedor de la app no lleva archivos de datos adentro.
 DATOS = Path("./data/raw/colectivos")
 # La ochava apunta hacia donde el colectivo VIENE, no hacia donde VA.
 RUMBO_OCHAVA = {
@@ -71,52 +77,71 @@ def distancia_metros(lat1, lon1, lat2, lon2):
     dlon = (lon1 - lon2) * 111_320 * math.cos(math.radians((lat1 + lat2) / 2))
     return math.hypot(dlat, dlon)
 
+_cliente_bq = None
+
+
+def cliente_bq():
+    # Perezoso: si el cliente se crea al importar, el agente entero no arranca
+    # cuando faltan las credenciales.
+    global _cliente_bq
+    if _cliente_bq is None:
+        from google.cloud import bigquery
+        _cliente_bq = bigquery.Client(project=PROYECTO_BQ)
+    return _cliente_bq
+
 
 def cargar_datos(forzar_recarga=False):
-    #Lee los CSV una vez por proceso y los deja indexados en memoria.
+    # Lee los recorridos de BigQuery una vez por proceso y los deja indexados
+    # en memoria. Son 45 mil filas que cambian una vez por semana, asi que el
+    # cache vale: sin el, cada pregunta de colectivos costaria tres consultas.
     global cache
     if cache is not None and not forzar_recarga:
         return cache
 
-    archivos = ["lineas.csv", "paradas_por_linea.csv", "trazados.csv"]
-    faltantes = [a for a in archivos if not (DATOS / a).exists()]
-    if faltantes:
-        raise FileNotFoundError(
-            f"Faltan {faltantes} en {DATOS.resolve()}. "
-            "Corré antes: uv run .\\scripts\\colectivos\\extraccion_recorridos.py"
-        )
+    bq = cliente_bq()
 
     lineas = {}
-    with open(DATOS / "lineas.csv", encoding="utf-8") as f:
-        for fila in csv.DictReader(f):
-            lineas[fila["id_linea"]] = fila
+    sql = f"select * from `{PROYECTO_BQ}.{DATASET_BQ}.stg_colectivos_lineas`"
+    for fila in bq.query(sql).result():
+        lineas[fila.id_linea] = dict(fila)
 
     paradas = []
-    with open(DATOS / "paradas_por_linea.csv", encoding="utf-8") as f:
-        for fila in csv.DictReader(f):
-            paradas.append({
-                "id_linea": fila["id_linea"],
-                "id_parada": fila["id_parada"],
-                "nombre": fila["nombre"],
-                "ochava": fila["ochava"],
-                "latitud": float(fila["latitud"]),
-                "longitud": float(fila["longitud"]),
-            })
+    sql = f"select * from `{PROYECTO_BQ}.{DATASET_BQ}.stg_colectivos_paradas`"
+    for fila in bq.query(sql).result():
+        paradas.append({
+            "id_linea": fila.id_linea,
+            "id_parada": fila.id_parada,
+            "nombre": fila.nombre,
+            "ochava": fila.ochava,
+            "latitud": fila.latitud,
+            "longitud": fila.longitud,
+        })
 
-    # (id_linea, sentido) -> lista de (lat, lon) en orden de recorrido
+    # El ORDER BY no es decorativo: el orden de los puntos es lo que permite
+    # saber si la bajada viene despues de la subida, y por lo tanto si el
+    # colectivo va para el lado correcto.
     trazados = {}
-    with open(DATOS / "trazados.csv", encoding="utf-8") as f:
-        for fila in csv.DictReader(f):
-            clave = (fila["id_linea"], fila["sentido"])
-            trazados.setdefault(clave, []).append(
-                (float(fila["latitud"]), float(fila["longitud"]))
-            )
+    sql = f"""
+        select id_linea, sentido, latitud, longitud
+        from `{PROYECTO_BQ}.{DATASET_BQ}.stg_colectivos_trazados`
+        order by id_linea, sentido, tramo, orden
+    """
+    for fila in bq.query(sql).result():
+        trazados.setdefault((fila.id_linea, fila.sentido), []).append(
+            (fila.latitud, fila.longitud)
+        )
+
+    if not lineas or not paradas or not trazados:
+        raise RuntimeError(
+            "Los recorridos estan vacios en BigQuery. Corre antes el DAG de "
+            "colectivos, o: uv run .\\scripts\\colectivos\\extraccion_recorridos.py"
+        )
 
     fecha = next(iter(lineas.values()), {}).get("fecha_extraccion")
 
-    cache = {"lineas": lineas, "paradas": paradas, "trazados": trazados, "fecha_extraccion": fecha}
+    cache = {"lineas": lineas, "paradas": paradas, "trazados": trazados,
+             "fecha_extraccion": fecha}
     return cache
-
 
 def paradas_cerca(latitud, longitud, radio_metros):
     #Paradas dentro del radio, con la distancia a pie.

@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: stg_colectivos_lineas
+    columns:
+      - name: id_linea
+        tests: [not_null, unique]
+      - name: nombre
+        tests: [not_null]
+
+  - name: stg_colectivos_paradas
+    columns:
+      - name: id_linea
+        tests: [not_null]
+      - name: latitud
+        tests: [not_null]
+      - name: longitud
+        tests: [not_null]
+
+  - name: stg_colectivos_trazados
+    columns:
+      - name: id_linea
+        tests: [not_null]
+      - name: sentido
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ida', 'vuelta']
+      - name: orden
+        tests: [not_null]

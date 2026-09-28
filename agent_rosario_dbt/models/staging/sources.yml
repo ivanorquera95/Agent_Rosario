@@ -87,3 +87,6 @@ sources:
             tests:
               - unique
               - not_null
+      - name: raw_colectivos_lineas
+      - name: raw_colectivos_paradas
+      - name: raw_colectivos_trazados
