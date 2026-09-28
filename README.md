@@ -43,6 +43,7 @@ deja disponible para preguntarle en castellano.
 
 ```
   FUENTES                    EXTRACCIÓN        TRANSFORMACIÓN      CONSUMO
+                             ╰──── local ────╯  ╰─ BigQuery ─╯     ╰─ Railway ─╯
 
   SEPA (1,65 GB/día)    ─┐
   descuentito-data       │
@@ -67,7 +68,7 @@ Cuatro DAGs orquestan todo:
 | `precios` | 15:00 de lunes a viernes | SEPA → limpieza → BigQuery → dbt |
 | `descuentos` | 07:00 diario | 3 extracciones en paralelo → limpieza → BigQuery → dbt |
 | `agenda` | 07:00 diario | scraping → BigQuery → dbt |
-| `colectivos` | domingo 03:00 | recorridos y paradas → BigQuery |
+| `colectivos` | domingo 03:00 | recorridos y paradas → BigQuery → dbt |
 
 ![Los cuatro DAGs en Airflow](docs/airflow-dags.png)
 
@@ -178,6 +179,38 @@ plausible es más peligroso que un nulo.
 es grande y sobre fondo plano, se buscan sólo dos datos de forma muy acotada,
 y sobre todo **se puede verificar**. En un folleto de precios hay cientos de
 productos, números de cuatro dígitos y ninguna forma de comprobar la lectura.
+
+### Verificar el sentido contra el recorrido real
+
+Google devolvía paradas donde el colectivo pasa en sentido contrario al del
+viaje. El sistema lo detecta porque tiene con qué comparar: los recorridos
+completos de las 53 líneas, punto por punto, extraídos de la Municipalidad.
+
+Si sobre el trazado la parada de bajada aparece **antes** que la de subida, ese
+colectivo va para el otro lado. Cada tramo se etiqueta con el resultado:
+
+| `sentido_verificado` | qué significa |
+|---|---|
+| `correcto` | la parada sirve para ese viaje |
+| `sentido_invertido` | Google mandaba mal y el sistema la reemplazó |
+| `no_verificable` | no hay datos del recorrido para confirmarlo |
+
+Con el tiempo el caso `sentido_invertido` se volvió mucho menos frecuente,
+pero el guardia sigue: una fuente externa puede volver a fallar, y el costo de
+verificar es una comparación de índices.
+
+### Los recorridos se leen de BigQuery, no de archivos
+
+La búsqueda de directos leía los recorridos de tres CSV en disco. Funcionaba en
+la máquina de desarrollo y falló apenas la app se desplegó: el contenedor no
+lleva archivos de datos adentro.
+
+Toda la lectura estaba concentrada en una función, así que el cambio fue
+reemplazar esa función por tres consultas y dejar intacta la lógica de
+verificación de sentidos. Los datos pasaron por dbt como el resto: el casteo de
+tipos deja de depender de la versión de pandas de cada entorno, y hay tests
+declarativos que verifican que no falten coordenadas ni el orden de los puntos
+del trazado, que es justamente lo que hace funcionar la verificación de sentido.
 
 ### El robots.txt de La Gallega cambió el diseño del scraper
 
@@ -310,6 +343,26 @@ verificado: nunca se subió un `.env` ni un archivo de credenciales.
 
 ---
 
+## Dónde corre cada cosa
+
+| Parte | Dónde | Por qué |
+|---|---|---|
+| Agente, API y web | Railway | Link público con HTTPS, que el micrófono necesita |
+| Sesiones del chat | Postgres en Railway | Al lado de la app, sin salir a internet |
+| Datos | BigQuery | Es donde ya vivían |
+| Airflow y los 4 DAGs | Local | Un entorno gestionado de orquestación cuesta más de lo que aporta en un proyecto personal |
+
+La consecuencia de tener Airflow en local es explícita: **los datos se
+actualizan cuando la máquina está encendida.** Para las fuentes que publican
+una vez por día no cambia mucho, y el agente avisa en cada respuesta que los
+precios son de la última publicación.
+
+La app no lleva credenciales de archivo: la cuenta de servicio de Google entra
+como variable de entorno y tiene sólo permiso de lectura sobre BigQuery. El
+agente no puede escribir en los datos porque no lo necesita.
+
+---
+
 ## Limitaciones conocidas
 
 Están acá porque un dato que parece completo y no lo es hace más daño que un
@@ -351,6 +404,7 @@ dato ausente.
 | API | FastAPI con streaming SSE |
 | interfaz | React (Vite), SVG animado, sin librerías de UI |
 | sesiones | Postgres |
+| deploy | Docker en Railway, con Postgres gestionado |
 
 ---
 
@@ -401,7 +455,7 @@ cd agent_rosario_dbt && uv run dbt build --profiles-dir .
 
 ```bash
 cd airflow
-cp .env.ejemplo .env      # ajustar la ruta de las credenciales
+cp .env.ejemplo .env      # ajustar rutas y credenciales
 mkdir dags logs
 docker compose up init
 docker compose up -d
@@ -433,6 +487,19 @@ uv run pytest                                    # 108 tests
 cd agent_rosario_dbt && uv run dbt test          # tests de datos
 ```
 
+### El deploy
+
+La imagen de Docker compila el frontend y lo sirve desde FastAPI, así que es un
+solo servicio. Railway la construye en cada push a `main`.
+
+```bash
+docker build -t rosario .
+```
+
+Variables que necesita: `OPENAI_API_KEY`, `GOOGLE_PLACES_API_KEY`,
+`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CREDENCIALES_JSON` (el contenido de la clave de
+la cuenta de servicio) y `DATABASE_URL`.
+
 ---
 
 ## Estructura
@@ -454,6 +521,7 @@ cd agent_rosario_dbt && uv run dbt test          # tests de datos
 │   ├── agenda/               agenda cultural municipal
 │   ├── clima/  monedas/  lugares/
 │   └── comun/                contexto por sesión y resumen hablado
+├── Dockerfile                imagen de la app (frontend + API)
 ├── docker-compose.yml        Postgres de sesiones
 └── tests/
     └── verdad_lareina.json   set de verdad para medir el OCR
@@ -463,11 +531,10 @@ cd agent_rosario_dbt && uv run dbt test          # tests de datos
 
 ## Qué falta
 
-- Los recorridos de colectivos no tienen modelos dbt
 - DIA se quedó con una sola promoción vigente: le falta fuente propia
 - Billetera Santa Fe (operada por PlusPagos) tiene una promoción única para
   los supermercados adheridos a CASAR, que incluye cadenas rosarinas sin
   cobertura acá (Dar, Arco Iris, El Solar). Es una sola promoción con muchos
-  comercios, no una por cadena: aportaría alcance, no variedad.
-- Airflow corre en local: para un proyecto personal, un entorno gestionado de
-  orquestación cuesta más de lo que aporta
+  comercios, no una por cadena: aportaría alcance, no variedad
+- La clave de Google Maps no está restringida por IP porque Railway no asigna
+  una fija. Las cuotas diarias por API son la protección que sí aplica

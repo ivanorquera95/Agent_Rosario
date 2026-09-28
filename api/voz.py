@@ -93,7 +93,14 @@ def transcribir(audio, nombre="audio.webm"):
         file=(nombre, audio),
         language="es",
         # El modelo escribe mejor los nombres propios si sabe de qué se habla.
-        prompt="Consulta sobre Rosario: colectivos, líneas, calles, supermercados, descuentos, precios, clima o eventos.",
+        prompt=(
+            "Consulta sobre Rosario, Argentina. Pueden aparecer: líneas de colectivo "
+            "(102, 133 negro, 142 rojo), calles (Pellegrini, Oroño, Córdoba, Mitre, "
+            "Alberdi, Cafferata), lugares (Monumento a la Bandera, Alto Rosario, "
+            "Parque Independencia, Seminario Arquidiocesano), supermercados (Coto, "
+            "Carrefour, Jumbo, La Gallega, La Reina, DIA, Vea, La Anónima) y medios de "
+            "pago (Personal Pay, Mercado Pago, MODO, Cuenta DNI, Credicoop, Naranja X)."
+        ),
     )
     return (respuesta.text or "").strip()
 
