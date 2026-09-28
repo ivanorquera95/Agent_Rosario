@@ -1,12 +1,16 @@
 import json
 import logging
-from openai import APIError
 import os
+from pathlib import Path
+
+from openai import APIError
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -15,6 +19,8 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from api.seguridad import CabecerasDeSeguridad, LimiteDeTamano, origenes_permitidos
 from api.limites import LimiteAlcanzado, tomar_turno_chat
+
+
 # Railway no permite subir archivos, asi que la credencial de Google viaja como
 # variable de entorno y se escribe a disco al arrancar. El archivo vive solo en
 # el contenedor, que es efimero.
@@ -36,7 +42,6 @@ from api.voz import (
     LimiteVoz, MAX_BYTES_AUDIO, devolver_turno, generar_audio, recortar,
     tomar_turno, tomar_turno_transcripcion, transcribir,
 )
-from pathlib import Path
 from colectivos.resolver_ubicacion import set_mensaje_usuario
 from comun.contexto import usar_contexto
 from fastapi.staticfiles import StaticFiles
